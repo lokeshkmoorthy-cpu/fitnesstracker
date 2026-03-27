@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 
 interface AuthPanelProps {
   loading: boolean;
@@ -13,6 +13,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,13 +65,22 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
           </label>
           <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">
             Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="h-10 rounded-lg bg-slate-950/60 border border-white/15 px-3 text-sm text-slate-100 outline-none focus:border-cyan-300/80"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="h-10 w-full rounded-lg bg-slate-950/60 border border-white/15 px-3 pr-10 text-sm text-slate-100 outline-none focus:border-cyan-300/80"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              >
+                {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            </div>
           </label>
 
           {error ? <p className="text-xs text-rose-300">{error}</p> : null}
