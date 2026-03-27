@@ -99,23 +99,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     key={item.id}
                     onClick={item.onClick}
                     disabled={item.disabled}
+                    aria-label={item.label}
                     className={cn(
-                      "flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-cyan-50/30 hover:from-cyan-100 hover:to-cyan-100/30 dark:border-cyan-200/30 dark:from-white/10 dark:to-white/5 dark:hover:from-cyan-300/20 dark:hover:to-cyan-300/10 transition-all group",
+                      "flex items-center justify-center w-full aspect-square rounded-lg border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-cyan-50/30 hover:from-cyan-100 hover:to-cyan-100/30 dark:border-cyan-200/30 dark:from-white/10 dark:to-white/5 dark:hover:from-cyan-300/20 dark:hover:to-cyan-300/10 transition-all group",
                       item.disabled && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     <Icon className={cn(
-                      "w-5 h-5 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
+                      "w-6 h-6 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
                       item.id === "refresh" && refreshing && "animate-spin"
                     )} />
-                    <span className="text-[9px] font-mono uppercase tracking-widest text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors mt-1 text-center">
-                      {item.label}
-                    </span>
-                    {item.sublabel && (
-                      <span className="text-[8px] font-mono uppercase tracking-widest text-slate-700 group-hover:text-cyan-700 dark:text-slate-500 dark:group-hover:text-cyan-400 transition-colors mt-0.5 text-center">
-                        {item.sublabel}
-                      </span>
-                    )}
                   </button>
                 );
               })}
