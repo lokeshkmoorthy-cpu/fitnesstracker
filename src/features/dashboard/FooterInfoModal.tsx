@@ -99,14 +99,4 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({ active, onClos
             <ul className="mt-4 space-y-2">
               {footerModalContent[active].points.map((point) => (
                 <li key={point} className="text-sm text-slate-700 flex gap-2 dark:text-slate-200">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-600 shrink-0 dark:bg-cyan-300" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
-};
+                  <span 

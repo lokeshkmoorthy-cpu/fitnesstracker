@@ -107,18 +107,4 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         </label>
         <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">
           Search
-          <div className="h-10 rounded-lg bg-white border border-slate-200 px-3 flex items-center gap-2 focus-within:border-cyan-600 dark:bg-slate-950/60 dark:border-white/15 dark:focus-within:border-cyan-300/80 transition-colors">
-            <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(event) => onChange({ search: event.target.value })}
-              placeholder="Exercises, sets, notes..."
-              className="w-full bg-transparent border-none text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
-            />
-          </div>
-        </label>
-      </div>
-    </motion.div>
-  );
-};
+          <div className="h-10 rounded-lg bg-white border border-sla
