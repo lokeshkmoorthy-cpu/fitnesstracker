@@ -82,7 +82,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors hover:scale-110"
+                className="cursor-pointer absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors hover:scale-110"
               >
                 {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
