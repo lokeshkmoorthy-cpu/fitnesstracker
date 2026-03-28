@@ -102,14 +102,68 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({ active, onClos
                 {footerModalContent[active].description}
               </p>
 
-              <ul className="space-y-3">
-                {footerModalContent[active].points.map((point) => (
-                  <li key={point} className="text-sm text-slate-700 flex gap-2 dark:text-slate-200">
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-600 shrink-0 dark:bg-cyan-300" />
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
+              {active === "support" ? (
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  {[
+                    {
+                      name: "Lokesh K",
+                      role: "Lead Node",
+                      phone: "9095498299",
+                      email: "lokeshkmoorthy@gmail.com",
+                      location: "Pondicherry",
+                    },
+                    {
+                      name: "Abilash Sakthivel",
+                      role: "Data Node",
+                      phone: "9600260346",
+                      email: "Abilash.avms@gmail.com",
+                      location: "Pondicherry",
+                    },
+                    {
+                      name: "Surya Kumar N",
+                      role: "Interface Node",
+                      phone: "6382664766",
+                      email: "suryanaveen347@gmail.com",
+                      location: "Chennai",
+                    },
+                  ].map((member) => (
+                    <div
+                      key={member.email}
+                      className="p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 hover:shadow-lg hover:scale-[1.02] transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-cyan-600/20 flex items-center justify-center text-cyan-600 font-semibold">
+                          {member.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-slate-800 dark:text-white">
+                            {member.name}
+                          </h4>
+                          <p className="text-xs text-cyan-600">{member.role}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                        <p>📞 {member.phone}</p>
+                        <p>✉️ {member.email}</p>
+                        <p>📍 {member.location}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {footerModalContent[active].points.map((point) => (
+                    <li
+                      key={point}
+                      className="text-sm text-slate-700 flex gap-2 dark:text-slate-200"
+                    >
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-600 shrink-0 dark:bg-cyan-300" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </motion.div>
         </motion.div>
