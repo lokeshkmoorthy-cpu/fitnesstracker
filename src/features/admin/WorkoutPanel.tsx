@@ -154,7 +154,7 @@ export function WorkoutPanel({ onRegisterCreateModalOpener }: WorkoutPanelProps)
                     onClick={() => setEditingCommand(cmd)}
                     className="p-2.5 opacity-0 group-hover:opacity-100 hover:bg-purple-50 dark:hover:bg-purple-900/40 rounded-xl text-slate-400 hover:text-purple-600 transition-all shadow-sm bg-white dark:bg-slate-800"
                   >
-                    <Edit3 className="w-4.5 h-4.5" />
+                    <Edit3 className="w-3 h-3" />
                   </button>
                 </div>
                 <div className="p-5 bg-white dark:bg-slate-950/40 rounded-2xl border border-slate-50 dark:border-white/5 shadow-premium-sm group-hover:shadow-none transition-all">
