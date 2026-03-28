@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { MessageSquare, Save, Loader2, Plus, Trash2, Edit3, ChevronRight, Info } from "lucide-react";
+import { MessageSquare, Save, Loader2, Plus, Trash2, Edit3, ChevronRight, Info, Clock, Terminal, X } from "lucide-react";
 import { fitnessApi } from "@/src/services/api";
 import { BotCommand } from "@/src/types/fitness";
+import { cn } from "@/src/lib/utils";
 
 export function WorkoutPanel() {
   const [commands, setCommands] = useState<BotCommand[]>([]);
@@ -68,31 +69,16 @@ export function WorkoutPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-cyan-500/10 rounded-lg">
-            <MessageSquare className="w-5 h-5 text-cyan-500" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Bot Commands</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Manage Telegram bot workout responses</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
-          <Info className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-[10px] font-medium uppercase tracking-wider text-amber-500">Admin Only</span>
-        </div>
-      </header>
-
+    <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 animate-in zoom-in-95 duration-200">
+        <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-2xl text-xs font-bold text-red-500 flex items-center gap-3">
+          <Info className="w-4 h-4 shrink-0" />
           {error}
         </div>
       )}
@@ -101,59 +87,68 @@ export function WorkoutPanel() {
         {commands.map((cmd) => (
           <div
             key={cmd.command}
-            className="group relative bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 shadow-sm hover:shadow-cyan-500/5"
+            className="group relative bg-slate-50/50 dark:bg-slate-900/30 border border-slate-100 dark:border-white/5 rounded-3xl p-6 hover:bg-white dark:hover:bg-slate-900/60 hover:shadow-premium transition-all duration-300"
           >
             {editingCommand?.command === cmd.command ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm font-bold text-cyan-500 uppercase tracking-tight">{cmd.command}</span>
-                  <div className="flex gap-2">
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-purple-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-lg shadow-purple-100 dark:shadow-none">Editing</span>
+                    <span className="font-mono text-base font-extrabold text-slate-900 dark:text-white">{cmd.command}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setEditingCommand(null)}
-                      className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors"
                     >
+                      <X className="w-3.5 h-3.5" />
                       Cancel
                     </button>
                     <button
                       onClick={() => handleUpdate(cmd.command, editingCommand.response)}
                       disabled={saving === cmd.command}
-                      className="flex items-center gap-2 px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-lg shadow-cyan-500/20 transition-all"
+                      className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-2xl text-xs font-bold shadow-lg shadow-purple-100 dark:shadow-none transition-all active:scale-95"
                     >
-                      {saving === cmd.command ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                      Save Changes
+                      {saving === cmd.command ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Update Response
                     </button>
                   </div>
                 </div>
                 <textarea
                   value={editingCommand.response}
                   onChange={(e) => setEditingCommand({ ...editingCommand, response: e.target.value })}
-                  className="w-full min-h-[120px] p-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-sans focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all resize-none"
+                  className="w-full min-h-[200px] p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-3xl text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-4 focus:ring-purple-600/5 focus:border-purple-600 outline-none transition-all resize-none shadow-sm scrollbar-custom"
                   placeholder="Enter workout instructions..."
                 />
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                      {cmd.command}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-[0.1em]">
-                      Last updated: {new Date(cmd.updatedAt).toLocaleDateString()}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-2 rounded-xl">
+                      <Terminal className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-mono text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-tight">
+                        {cmd.command}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                        <Clock className="w-3 h-3" />
+                        Updated {new Date(cmd.updatedAt).toLocaleDateString()}
+                      </div>
+                    </div>
                   </div>
                   <button
                     onClick={() => setEditingCommand(cmd)}
-                    className="p-2 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-400 hover:text-cyan-500 transition-all"
+                    className="p-2.5 opacity-0 group-hover:opacity-100 hover:bg-purple-50 dark:hover:bg-purple-900/40 rounded-xl text-slate-400 hover:text-purple-600 transition-all shadow-sm bg-white dark:bg-slate-800"
                   >
-                    <Edit3 className="w-4 h-4" />
+                    <Edit3 className="w-4.5 h-4.5" />
                   </button>
                 </div>
-                <div className="relative">
-                  <pre className="text-xs text-slate-600 dark:text-slate-400 font-sans whitespace-pre-wrap line-clamp-3 bg-slate-50/50 dark:bg-black/10 p-3 rounded-lg border border-slate-100 dark:border-white/5">
+                <div className="p-5 bg-white dark:bg-slate-950/40 rounded-2xl border border-slate-50 dark:border-white/5 shadow-premium-sm group-hover:shadow-none transition-all">
+                  <pre className="text-xs font-medium text-slate-600 dark:text-slate-300 font-sans whitespace-pre-wrap line-clamp-3 leading-relaxed tracking-tight">
                     {cmd.response}
                   </pre>
-                  <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white dark:from-slate-900/40 pointer-events-none rounded-b-lg opacity-40" />
                 </div>
               </div>
             )}
@@ -161,34 +156,42 @@ export function WorkoutPanel() {
         ))}
 
         {/* Create New Command */}
-        <div className="bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 hover:border-cyan-500/50 transition-all duration-300 shadow-sm">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-medium text-sm">
-              <Plus className="w-4 h-4" />
-              <span>Create New Bot Command</span>
+        <div className="bg-white dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-3xl p-8 hover:border-purple-600/50 transition-all duration-300 shadow-sm mt-4">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-3">
+               <div className="p-2.5 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
+                  <Plus className="w-4 h-4 text-slate-400" />
+               </div>
+               <div>
+                 <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight block">Add New Response</span>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Create a custom bot trigger</span>
+               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                value={newCommandName}
-                onChange={(e) => setNewCommandName(e.target.value)}
-                placeholder="Command (e.g. /abs)"
-                className="p-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all"
-              />
+            
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="sm:col-span-3">
+                <input
+                  type="text"
+                  value={newCommandName}
+                  onChange={(e) => setNewCommandName(e.target.value)}
+                  placeholder="Command key (e.g. /legday)"
+                  className="w-full p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-purple-600/5 focus:border-purple-600 outline-none transition-all placeholder:text-slate-400"
+                />
+              </div>
               <button
                 onClick={handleCreate}
                 disabled={saving === "new" || !newCommandName || !newCommandResponse}
-                className="flex items-center justify-center gap-2 p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-30 rounded-xl text-sm font-bold shadow-lg transition-all"
+                className="flex items-center justify-center gap-2 p-3.5 bg-slate-900 dark:bg-purple-600 text-white hover:bg-slate-800 dark:hover:bg-purple-700 disabled:opacity-30 rounded-2xl text-sm font-bold shadow-lg transition-all active:scale-95"
               >
                 {saving === "new" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Add Command
+                Create
               </button>
             </div>
             <textarea
               value={newCommandResponse}
               onChange={(e) => setNewCommandResponse(e.target.value)}
-              placeholder="Full workout instruction text..."
-              className="w-full min-h-[100px] p-4 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all resize-none shadow-sm"
+              placeholder="Full workout instruction markdown text..."
+              className="w-full min-h-[140px] p-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-4 focus:ring-purple-600/5 focus:border-purple-600 outline-none transition-all resize-none placeholder:text-slate-400 scrollbar-custom"
             />
           </div>
         </div>

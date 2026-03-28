@@ -41,22 +41,30 @@ body {
 }
 
 /* Modern Scrollbars */
-::-webkit-scrollbar {
+.scrollbar-custom::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-::-webkit-scrollbar-track {
+.scrollbar-custom::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+.scrollbar-custom::-webkit-scrollbar-thumb {
   background: #e5e7eb;
   border-radius: 10px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
+.dark .scrollbar-custom::-webkit-scrollbar-thumb {
   background: #374151;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+.dark .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
 }
 
 /* Metro Scatter Adjustment for subtle depth */

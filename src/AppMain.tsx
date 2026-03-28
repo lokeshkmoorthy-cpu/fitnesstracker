@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, Loader2, TrendingUp, Users, Flame, Zap, Bolt } from "lucide-react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Activity, Calendar, Loader2, TrendingUp, Users, Flame, Zap, Bolt, ChevronUp, Plus } from "lucide-react";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { DashboardHero } from "@/src/components/DashboardHero";
@@ -46,6 +46,7 @@ export default function AppMain() {
   const [savingGoals, setSavingGoals] = useState(false);
   const [activeFooterModal, setActiveFooterModal] = useState<FooterModalKey | null>(null);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isAdminCollapsed, setIsAdminCollapsed] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>({
     user: "all",
     muscleGroup: "all",
@@ -53,6 +54,20 @@ export default function AppMain() {
     endDate: "",
     search: "",
   });
+
+  const workoutPanelRef = useRef<HTMLDivElement>(null);
+  const goalsSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToAddWorkout = () => {
+    setIsAdminCollapsed(false);
+    setTimeout(() => {
+        workoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const scrollToGoals = () => {
+    goalsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const workoutFilterOptions = useMemo(() => buildWorkoutFilters(workouts), [workouts]);
   const filteredWorkouts = useMemo(() => filterWorkouts(workouts, filters), [workouts, filters]);
@@ -292,7 +307,7 @@ export default function AppMain() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
       </div>
     );
@@ -304,21 +319,21 @@ export default function AppMain() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f9fafb] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#f9fafb] dark:bg-slate-950 flex items-center justify-center p-6">
         <div className="w-full max-w-6xl animate-pulse space-y-8">
-           <div className="h-20 bg-white rounded-3xl" />
+           <div className="h-20 bg-white dark:bg-white/5 rounded-3xl" />
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-48 bg-white rounded-3xl" />
-              <div className="h-48 bg-white rounded-3xl" />
+              <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
+              <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
            </div>
-           <div className="h-96 bg-white rounded-3xl" />
+           <div className="h-96 bg-white dark:bg-white/5 rounded-3xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-slate-950 flex font-sans overflow-x-hidden transition-colors">
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="metro-scatter" />
       </div>
@@ -332,13 +347,19 @@ export default function AppMain() {
       />
 
       <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 max-w-[1600px] mx-auto overflow-y-auto">
-        <TopBar title="Dashboard" />
+        <TopBar 
+          title="Dashboard" 
+          onRefresh={fetchWorkouts}
+          refreshing={refreshing}
+        />
         
-        <DashboardHero userName={authUser.displayName} />
+        <DashboardHero 
+          userName={authUser.displayName} 
+          onAddClick={scrollToAddWorkout}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-8 space-y-8">
-            {/* Quick Metrics Integration */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard 
                 label="Total Exercises" 
@@ -392,41 +413,57 @@ export default function AppMain() {
               current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)} 
               total={selectedGoal?.stepsGoal || 10000} 
               label=" Steps" 
+              onSetGoalClick={scrollToGoals}
             />
 
             {authUser?.role === "admin" && (
-              <div className="bg-white rounded-3xl p-8 shadow-premium border border-slate-50 transition-all">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-purple-50 rounded-xl">
-                    <Users className="w-5 h-5 text-purple-600" />
+              <div ref={workoutPanelRef} className="bg-white dark:bg-white/5 rounded-3xl p-6 shadow-premium border border-slate-50 dark:border-white/10 transition-all scroll-mt-8 group/admin overflow-hidden">
+                <div 
+                   onClick={() => setIsAdminCollapsed(!isAdminCollapsed)}
+                   className="flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-xl group-hover/admin:bg-purple-100 transition-colors">
+                      <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Admin Console</h3>
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">Admin Console</h3>
+                  <button className="p-2 text-slate-400 hover:text-purple-600 transition-colors">
+                    {isAdminCollapsed ? <Plus className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                  </button>
                 </div>
-                <WorkoutPanel />
+                
+                {!isAdminCollapsed && (
+                  <div className="mt-8 animate-in fade-in zoom-in-95 duration-300">
+                    <WorkoutPanel />
+                  </div>
+                )}
               </div>
             )}
 
-            <GoalsSection
-              selectedUser={canSelectUser ? filters.user : authUser.displayName}
-              goals={goals}
-              selectedGoalId={selectedGoalId}
-              streaks={streaks}
-              userWiseGoals={userWiseGoals}
-              saving={savingGoals}
-              onSelectGoal={setSelectedGoalId}
-              onCreate={createGoal}
-              onUpdate={updateGoal}
-              onDelete={deleteGoal}
-            />
+            <div ref={goalsSectionRef} className="scroll-mt-8">
+              <GoalsSection
+                selectedUser={canSelectUser ? filters.user : authUser.displayName}
+                goals={goals}
+                selectedGoalId={selectedGoalId}
+                streaks={streaks}
+                userWiseGoals={userWiseGoals}
+                saving={savingGoals}
+                onSelectGoal={setSelectedGoalId}
+                onCreate={createGoal}
+                onUpdate={updateGoal}
+                onDelete={deleteGoal}
+              />
+            </div>
           </div>
         </div>
 
-        <footer className="mt-20 pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
+        <footer className="mt-20 pt-12 border-t border-slate-100 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
                 <Bolt className="w-4 h-4 text-white fill-white/20" />
              </div>
-             <span className="text-sm font-bold text-slate-900 tracking-tight">SweatIQ Dashboard</span>
+             <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">SweatIQ Dashboard</span>
           </div>
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
             Powered by Fitness Intelligence Team

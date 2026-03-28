@@ -1,24 +1,39 @@
-import React from "react";
 import { 
   Bell, 
   MessageSquare, 
   ChevronLeft,
   Globe,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from "lucide-react";
+import { cn } from "@/src/lib/utils";
 
 interface TopBarProps {
   title: string;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ title }) => {
+export const TopBar: React.FC<TopBarProps> = ({ title, onRefresh, refreshing }) => {
   return (
     <header className="flex items-center justify-between mb-10">
       <div className="flex items-center gap-6">
         <button className="p-2.5 bg-white rounded-xl shadow-premium border border-slate-50 text-slate-400 hover:text-purple-600 transition-all">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h2>
+          <button 
+            onClick={onRefresh}
+            disabled={refreshing}
+            className={cn(
+              "p-2 bg-white rounded-xl shadow-premium border border-slate-50 text-slate-400 hover:text-purple-600 transition-all active:scale-95",
+              refreshing && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">

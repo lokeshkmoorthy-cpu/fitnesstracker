@@ -5,9 +5,10 @@ interface GoalProgressCardProps {
   current: number;
   total: number;
   label: string;
+  onSetGoalClick?: () => void;
 }
 
-export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({ current, total, label }) => {
+export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({ current, total, label, onSetGoalClick }) => {
   const percentage = Math.min(100, Math.max(0, (current / total) * 100));
   
   // Semi-circle path calculation
@@ -57,7 +58,10 @@ export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({ current, tot
         <span className="text-xs font-medium text-slate-400">You have reached {Math.round(percentage)}% of your goal this month</span>
       </div>
       
-      <button className="mt-4 flex items-center justify-between w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-all text-sm font-bold text-slate-600">
+      <button 
+        onClick={onSetGoalClick}
+        className="mt-4 flex items-center justify-between w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-all text-sm font-bold text-slate-600"
+      >
         <span>Set Fitness Goals</span>
         <ArrowRight className="w-4 h-4" />
       </button>
