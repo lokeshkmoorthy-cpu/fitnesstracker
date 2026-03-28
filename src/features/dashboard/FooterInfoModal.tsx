@@ -18,7 +18,7 @@ const footerModalContent: Record<
       "Built with React (TypeScript) for the frontend, Node.js with Express on the backend, and Google Sheets as the data store.",
       "Key features include user login, workout tracking, calorie monitoring, and a concise dashboard.",
       "Modules cover user management, activity tracking, data management, and analytics.",
-      "Overall, the project enhanced practical skills in full-stack development, teamwork, and problem-solving.",
+      "The project enhanced practical skills in full-stack development, teamwork, and problem-solving.","Fitness tracking system designed for users to monitor daily activities, with basic roles, system requirements, and a structured workflow.","It uses React, Node.js, and Google Sheets with REST APIs to handle data storage and communication between frontend and backend.","The system has some limitations like scalability and security but includes proper error handling and follows an Agile development approach.","It helped in learning full-stack development, teamwork, and can be enhanced with AI features, mobile apps, and wearable integration.","The documentation can be enhanced by adding diagrams like use case, sequence, and database schema to explain system design clearly.","It should include UI/UX design, code structure, performance optimization, and security measures for better implementation understanding.","Details about deployment, version control, testing, and risk analysis improve the project’s professionalism and reliability.","Additional sections like user guide, project timeline, and overall workflow help in making the documentation complete and easy to follow.",
     ],
   },
   privacy: {
@@ -30,7 +30,7 @@ const footerModalContent: Record<
       "All data is stored securely using cloud-based services, and we take reasonable measures to protect it, but users should avoid sharing sensitive data through this interface.",
       "You have full control over your data and can update or request deletion of your information at any time.",
       "This privacy policy may be updated in the future, and any major changes will be communicated through the application.",
-      "For any privacy-related concerns, please contact the development team.",
+      "For any privacy-related concerns, please contact the development team.","The application collects only necessary data, uses cookies for better experience, and stores data securely for a limited time with user control over deletion.","The application collects only necessary data, uses cookies for better experience, and stores data securely for a limited time with user control over deletion.","It ensures authentication security, restricts access to authorized entities, and avoids collecting sensitive personal information.","Trusted third-party services may be used, while maintaining compliance with standard data protection principles.","The application collects minimal data, uses cookies for functionality, and stores information securely with user control over updates and deletion.", "It ensures secure authentication, restricts unauthorized access, and does not collect sensitive personal data.","Third-party services may be used responsibly while following standard privacy and data protection practices.","Users give consent, must provide accurate data, and will be informed of any breaches or permission-based access.",
     ],
   },
   support: {
@@ -80,7 +80,7 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({ active, onClos
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.22 }}
-            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_24px_64px_rgba(0,0,0,0.15)] dark:border-white/15 dark:bg-slate-950/95 dark:shadow-[0_24px_64px_rgba(0,0,0,0.45)]"
+            className="w-full max-w-4xl max-h-[80vh] overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_24px_64px_rgba(0,0,0,0.15)] dark:border-white/15 dark:bg-slate-950/95 dark:shadow-[0_24px_64px_rgba(0,0,0,0.45)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-4">
@@ -97,18 +97,74 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({ active, onClos
               </button>
             </div>
 
-            <p className="mt-3 text-base text-slate-700 leading-relaxed dark:text-slate-300">
-              {footerModalContent[active].description}
-            </p>
+            <div className="mt-4 overflow-y-auto space-y-3 text-sm max-h-[68vh] pr-2">
+              <p className="text-base text-slate-700 leading-relaxed dark:text-slate-300">
+                {footerModalContent[active].description}
+              </p>
 
-            <ul className="mt-4 space-y-3">
-              {footerModalContent[active].points.map((point) => (
-                <li key={point} className="text-sm text-slate-700 flex gap-2 dark:text-slate-200">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-600 shrink-0 dark:bg-cyan-300" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
+              {active === "support" ? (
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  {[
+                    {
+                      name: "Lokesh K",
+                      role: "Lead Node",
+                      phone: "9095498299",
+                      email: "lokeshkmoorthy@gmail.com",
+                      location: "Pondicherry",
+                    },
+                    {
+                      name: "Abilash Sakthivel",
+                      role: "Data Node",
+                      phone: "9600260346",
+                      email: "Abilash.avms@gmail.com",
+                      location: "Pondicherry",
+                    },
+                    {
+                      name: "Surya Kumar N",
+                      role: "Interface Node",
+                      phone: "6382664766",
+                      email: "suryanaveen347@gmail.com",
+                      location: "Chennai",
+                    },
+                  ].map((member) => (
+                    <div
+                      key={member.email}
+                      className="p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 hover:shadow-lg hover:scale-[1.02] transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-cyan-600/20 flex items-center justify-center text-cyan-600 font-semibold">
+                          {member.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-slate-800 dark:text-white">
+                            {member.name}
+                          </h4>
+                          <p className="text-xs text-cyan-600">{member.role}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                        <p>📞 {member.phone}</p>
+                        <p>✉️ {member.email}</p>
+                        <p>📍 {member.location}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {footerModalContent[active].points.map((point) => (
+                    <li
+                      key={point}
+                      className="text-sm text-slate-700 flex gap-2 dark:text-slate-200"
+                    >
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-600 shrink-0 dark:bg-cyan-300" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       ) : null}
