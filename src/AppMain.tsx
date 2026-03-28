@@ -317,12 +317,12 @@ export default function AppMain() {
     return (
       <div className="min-h-screen bg-[#f9fafb] dark:bg-slate-950 flex items-center justify-center p-6">
         <div className="w-full max-w-6xl animate-pulse space-y-8">
-           <div className="h-20 bg-white dark:bg-white/5 rounded-3xl" />
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
-              <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
-           </div>
-           <div className="h-96 bg-white dark:bg-white/5 rounded-3xl" />
+          <div className="h-20 bg-white dark:bg-white/5 rounded-3xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
+            <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
+          </div>
+          <div className="h-96 bg-white dark:bg-white/5 rounded-3xl" />
         </div>
       </div>
     );
@@ -334,48 +334,48 @@ export default function AppMain() {
         <div className="metro-scatter" />
       </div>
 
-        <Sidebar 
-          user={authUser} 
-          onRefresh={fetchWorkouts} 
-          refreshing={refreshing} 
-          onLogout={handleLogout} 
-          onHelp={() => setIsHelpModalOpen(true)} 
-          onOpenAdmin={() => setIsAdminModalOpen(true)}
-        />
+      <Sidebar
+        user={authUser}
+        onRefresh={fetchWorkouts}
+        refreshing={refreshing}
+        onLogout={handleLogout}
+        onHelp={() => setIsHelpModalOpen(true)}
+        onOpenAdmin={() => setIsAdminModalOpen(true)}
+      />
 
       <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 max-w-[1600px] mx-auto overflow-y-auto">
-        <TopBar 
-          title="Dashboard" 
+        <TopBar
+          title="Dashboard"
           onRefresh={fetchWorkouts}
           refreshing={refreshing}
         />
-        
-        <DashboardHero 
-            userName={authUser.displayName} 
-            onAddClick={openAdminConsole}
-          />
+
+        <DashboardHero
+          userName={authUser.displayName}
+          onAddClick={openAdminConsole}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatCard 
-                label="Total Exercises" 
-                value={filteredWorkouts.length} 
-                icon={<Activity className="w-5 h-5" />} 
+              <StatCard
+                label="Total Exercises"
+                value={filteredWorkouts.length}
+                icon={<Activity className="w-5 h-5" />}
                 trend="+12%"
                 subtitle="From last week"
               />
-              <StatCard 
-                label="Active Time" 
-                value={`${Math.round(filteredWorkouts.length * 0.75)}h`} 
-                icon={<Flame className="w-5 h-5" />} 
+              <StatCard
+                label="Active Time"
+                value={`${Math.round(filteredWorkouts.length * 0.75)}h`}
+                icon={<Flame className="w-5 h-5" />}
                 trend="+5%"
                 subtitle="Total activity"
               />
-              <StatCard 
-                label="Workout Days" 
-                value={new Set(filteredWorkouts.map((w) => w.date)).size} 
-                icon={<Zap className="w-5 h-5" />} 
+              <StatCard
+                label="Workout Days"
+                value={new Set(filteredWorkouts.map((w) => w.date)).size}
+                icon={<Zap className="w-5 h-5" />}
                 trend="+2"
                 subtitle="Consistency"
               />
@@ -393,23 +393,23 @@ export default function AppMain() {
             />
 
             <WorkoutChart data={chartData} />
-            
-            <WorkoutTable 
-              workouts={filteredWorkouts} 
+
+            <WorkoutTable
+              workouts={filteredWorkouts}
               searchQuery={filters.search}
               onSearchChange={(search) => setFilters(p => ({ ...p, search }))}
               filterValue={filters.muscleGroup}
               onFilterChange={(muscleGroup) => setFilters(p => ({ ...p, muscleGroup }))}
             />
-            
+
             <ActivitySection activity={activity} />
           </div>
 
           <div className="lg:col-span-4 space-y-8">
-            <GoalProgressCard 
-              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)} 
-              total={selectedGoal?.stepsGoal || 10000} 
-              label=" Steps" 
+            <GoalProgressCard
+              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)}
+              total={selectedGoal?.stepsGoal || 10000}
+              label=" Steps"
               onSetGoalClick={scrollToGoals}
             />
 
@@ -432,10 +432,10 @@ export default function AppMain() {
 
         <footer className="mt-20 pt-12 border-t border-slate-100 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
-                <Bolt className="w-4 h-4 text-white fill-white/20" />
-             </div>
-             <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">SweatIQ Dashboard</span>
+            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+              <Bolt className="w-4 h-4 text-white fill-white/20" />
+            </div>
+            <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Fit Tracker Dashboard</span>
           </div>
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
             Powered by Fitness Intelligence Team
@@ -448,9 +448,9 @@ export default function AppMain() {
         </footer>
       </main>
 
-        <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
-        <AdminConsoleModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
-        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+      <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
+      <AdminConsoleModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
+      <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
     </div>
   );
 }
