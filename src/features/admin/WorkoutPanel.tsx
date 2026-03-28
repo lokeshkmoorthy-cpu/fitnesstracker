@@ -3,8 +3,13 @@ import { MessageSquare, Save, Loader2, Plus, Trash2, Edit3, ChevronRight, Info, 
 import { fitnessApi } from "@/src/services/api";
 import { BotCommand } from "@/src/types/fitness";
 import { cn } from "@/src/lib/utils";
+import { CreateCommandModal } from "@/src/components/CreateCommandModal";
 
-export function WorkoutPanel() {
+interface WorkoutPanelProps {
+  onRegisterCreateModalOpener?: (open: () => void) => void;
+}
+
+export function WorkoutPanel({ onRegisterCreateModalOpener }: WorkoutPanelProps) {
   const [commands, setCommands] = useState<BotCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -12,6 +17,12 @@ export function WorkoutPanel() {
   const [editingCommand, setEditingCommand] = useState<BotCommand | null>(null);
   const [newCommandName, setNewCommandName] = useState("");
   const [newCommandResponse, setNewCommandResponse] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  useEffect(() => {
+    if (onRegisterCreateModalOpener) {
+      onRegisterCreateModalOpener(() => setIsCreateModalOpen(true));
+    }
+  }, [onRegisterCreateModalOpener]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -59,6 +70,7 @@ export function WorkoutPanel() {
       await fetchData();
       setNewCommandName("");
       setNewCommandResponse("");
+      setIsCreateModalOpen(false);
     } catch (err) {
       setError("Failed to create command");
     } finally {
@@ -155,46 +167,17 @@ export function WorkoutPanel() {
           </div>
         ))}
 
-        {/* Create New Command */}
-        <div className="bg-white dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-3xl p-8 hover:border-purple-600/50 transition-all duration-300 shadow-sm mt-4">
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-3">
-               <div className="p-2.5 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
-                  <Plus className="w-4 h-4 text-slate-400" />
-               </div>
-               <div>
-                 <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight block">Add New Response</span>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Create a custom bot trigger</span>
-               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="sm:col-span-3">
-                <input
-                  type="text"
-                  value={newCommandName}
-                  onChange={(e) => setNewCommandName(e.target.value)}
-                  placeholder="Command key (e.g. /legday)"
-                  className="w-full p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-purple-600/5 focus:border-purple-600 outline-none transition-all placeholder:text-slate-400"
-                />
-              </div>
-              <button
-                onClick={handleCreate}
-                disabled={saving === "new" || !newCommandName || !newCommandResponse}
-                className="flex items-center justify-center gap-2 p-3.5 bg-slate-900 dark:bg-purple-600 text-white hover:bg-slate-800 dark:hover:bg-purple-700 disabled:opacity-30 rounded-2xl text-sm font-bold shadow-lg transition-all active:scale-95"
-              >
-                {saving === "new" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Create
-              </button>
-            </div>
-            <textarea
-              value={newCommandResponse}
-              onChange={(e) => setNewCommandResponse(e.target.value)}
-              placeholder="Full workout instruction markdown text..."
-              className="w-full min-h-[140px] p-5 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-white/10 rounded-2xl text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-4 focus:ring-purple-600/5 focus:border-purple-600 outline-none transition-all resize-none placeholder:text-slate-400 scrollbar-custom"
-            />
-          </div>
-        </div>
+
+        <CreateCommandModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          command={newCommandName}
+          response={newCommandResponse}
+          onCommandChange={setNewCommandName}
+          onResponseChange={setNewCommandResponse}
+          submitting={saving === "new"}
+          onSubmit={handleCreate}
+        />
       </div>
     </div>
   );
