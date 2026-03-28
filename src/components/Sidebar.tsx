@@ -49,17 +49,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     }
   };
 
-  const mainMenuItems = [
-    { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
-    { icon: Activity, label: "Exercise", id: "exercise", hasSubmenu: true },
-    { icon: Map, label: "Run Tracker", id: "run" },
-    { icon: CalendarIcon, label: "Calendar", id: "calendar" },
-    { icon: Target, label: "Fitness Goals", id: "goals", hasSubmenu: true },
-  ];
 
-  const accountItems = [
-    { icon: LifeBuoy, label: "Support", id: "support" },
-    { icon: Settings, label: "Settings", id: "settings" },
+  const menuItems = [
+    {
+      icon: User,
+      label: user.displayName,
+      sublabel: user.role,
+      id: "user",
+      custom: true
+    },
+    {
+      icon: RefreshCw,
+      label: refreshing ? "Syncing..." : "Refresh",
+      id: "refresh",
+      custom: true,
+      onClick: onRefresh,
+      disabled: refreshing
+    },
+    {
+      icon: LogOut,
+      label: "Logout",
+      id: "logout",
+      custom: true,
+      onClick: onLogout
+    },
+    {
+      icon: HelpCircle,
+      label: "Help",
+      id: "help",
+      custom: true,
+      onClick: onHelp
+    },
+    {
+      icon: theme === "dark" ? Sun : Moon,
+      label: theme === "dark" ? "Light Mode" : "Dark Mode",
+      id: "theme",
+      custom: true,
+      onClick: toggleTheme
+    },
   ];
 
   return (
@@ -88,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Fit Tracker</span>
           </div>
 
-          <nav className="flex-1 space-y-8 overflow-y-auto pr-2">
+          <nav className="flex-1 space-y-8">
             {/* Main Menu */}
             <div>
               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
@@ -100,21 +127,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     className={cn(
                       "flex items-center justify-between w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
                       activeItem === item.id
-                        ? "bg-slate-100 dark:bg-white/5 text-slate-900 dark:text-white"
-                        : "text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-white"
+                        ? "bg-slate-100 text-slate-900"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                     )}
                   >
-                    <div className="flex items-center gap-3.5">
-                      <item.icon className={cn(
-                        "w-5 h-5 transition-colors",
-                        activeItem === item.id ? "text-purple-600" : "text-slate-400 group-hover:text-slate-600"
-                      )} />
-                      <span className="text-sm font-semibold tracking-tight">{item.label}</span>
-                    </div>
-                    {item.hasSubmenu && <ChevronRight className="w-4 h-4 opacity-50" />}
-                    {activeItem === item.id && (
-                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-purple-600 rounded-r-full" />
-                    )}
+                    <Icon
+                      className={cn(
+                        "w-6 h-6 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
+                        item.id === "refresh" && refreshing && "animate-spin"
+                      )}
+                    />
+                    <span className="mt-1 text-[10px] font-semibold text-slate-600 group-hover:text-cyan-600 dark:text-slate-300 dark:group-hover:text-cyan-300">
+                      {item.label}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -127,10 +152,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 {accountItems.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => menuAction(item.id)}
+                    onClick={() => setActiveItem(item.id)}
                     className={cn(
-                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-white",
-                      activeItem === item.id && "bg-slate-100 dark:bg-white/5 text-slate-900 dark:text-white"
+                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                      activeItem === item.id && "bg-slate-100 text-slate-900"
                     )}
                   >
                     <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
@@ -141,47 +166,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             </div>
           </nav>
 
-          {/* Bottom Actions */}
-          <div className="mt-auto space-y-6 pt-8 border-t border-slate-100 dark:border-white/10">
-             {/* Sync Action */}
-             <button 
-                onClick={onRefresh}
-                disabled={refreshing}
-                className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 transition-all font-bold text-xs"
-             >
-                <RefreshCcw className={cn("w-4 h-4", refreshing && "animate-spin")} />
-                {refreshing ? "Syncing Data..." : "Sync with Sheets"}
-             </button>
-
-             {/* Theme Toggle */}
-             <div className="flex items-center justify-between px-4">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Theme</span>
-                <button 
-                  onClick={toggleTheme}
-                  className="p-1.5 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10 text-slate-400 dark:text-slate-500 hover:text-purple-600 transition-all"
-                >
-                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                </button>
-             </div>
-
-            {/* User Profile */}
-            <div className="flex items-center justify-between bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <User className="w-5 h-5 text-purple-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{user.displayName}</span>
-                  <span className="text-[10px] font-medium text-slate-400 truncate max-w-[100px]">{user.email}</span>
-                </div>
+          {/* User Profile */}
+          <div className="mt-auto pt-8 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                <User className="w-6 h-6 text-slate-400 translate-y-1" />
               </div>
-              <button
-                onClick={onLogout}
-                className="p-2 text-slate-400 hover:text-red-500 transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-900 leading-tight">{user.displayName}</span>
+                <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">{user.email}</span>
+              </div>
             </div>
+            <button
+              onClick={onLogout}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </aside>
@@ -189,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/10 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
