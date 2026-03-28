@@ -1,5 +1,6 @@
 import React from "react";
-import { Dumbbell, LogOut, RefreshCw } from "lucide-react";
+import { Dumbbell, HelpCircle, LogOut, Moon, RefreshCw, Sun } from "lucide-react";
+import { useTheme } from "@/src/contexts/ThemeContext";
 import { cn } from "@/src/lib/utils";
 import type { AuthUser } from "@/src/types/fitness";
 
@@ -8,9 +9,12 @@ interface HeaderProps {
   refreshing: boolean;
   user: AuthUser;
   onLogout: () => void;
+  onHelp: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onRefresh, refreshing, user, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ onRefresh, refreshing, user, onLogout, onHelp }) => {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <header className="relative border-b border-white/10 dark:border-white/10 p-4 md:p-6 flex justify-between items-center sticky top-0 bg-[#07080D]/70 dark:bg-[#07080D]/70 backdrop-blur-xl z-20 data-[theme=light]:bg-white/90 data-[theme=light]:border-slate-200">
       <div className="flex items-center gap-3">
@@ -27,6 +31,20 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh, refreshing, user, onL
           <p className="text-xs font-medium text-slate-200 dark:text-slate-200 data-[theme=light]:text-slate-700">{user.displayName}</p>
           <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-slate-400 dark:text-slate-400 data-[theme=light]:text-slate-500">{user.role}</p>
         </div>
+        <button
+          onClick={onHelp}
+          className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest px-3 py-2 rounded-lg border border-white/20 dark:border-white/20 data-[theme=light]:border-slate-300 text-slate-300 dark:text-slate-300 data-[theme=light]:text-slate-600 hover:text-white dark:hover:text-white data-[theme=light]:hover:text-slate-900 hover:border-cyan-200/60 dark:hover:border-cyan-200/60 data-[theme=light]:hover:border-cyan-400 transition-all"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          Help
+        </button>
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest px-3 py-2 rounded-lg border border-white/20 dark:border-white/20 data-[theme=light]:border-slate-300 text-slate-300 dark:text-slate-300 data-[theme=light]:text-slate-600 hover:text-white dark:hover:text-white data-[theme=light]:hover:text-slate-900 hover:border-cyan-200/60 dark:hover:border-cyan-200/60 data-[theme=light]:hover:border-cyan-400 transition-all"
+        >
+          {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          {theme === "dark" ? "Light" : "Dark"}
+        </button>
         <button
           onClick={onRefresh}
           disabled={refreshing}
