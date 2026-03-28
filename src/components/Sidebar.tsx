@@ -29,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
   const [isOpen, setIsOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
 
+<<<<<<< HEAD
   const mainMenuItems = [
     { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
     { icon: Activity, label: "Exercise", id: "exercise", hasSubmenu: true },
@@ -40,6 +41,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
   const accountItems = [
     { icon: LifeBuoy, label: "Support", id: "support" },
     { icon: Settings, label: "Settings", id: "settings" },
+=======
+  const menuItems = [
+    {
+      icon: User,
+      label: user.displayName,
+      sublabel: user.role,
+      id: "user",
+      custom: true
+    },
+    {
+      icon: RefreshCw,
+      label: refreshing ? "Syncing..." : "Refresh",
+      id: "refresh",
+      custom: true,
+      onClick: onRefresh,
+      disabled: refreshing
+    },
+    {
+      icon: LogOut,
+      label: "Logout",
+      id: "logout",
+      custom: true,
+      onClick: onLogout
+    },
+    {
+      icon: HelpCircle,
+      label: "Help",
+      id: "help",
+      custom: true,
+      onClick: onHelp
+    },
+    {
+      icon: theme === "dark" ? Sun : Moon,
+      label: theme === "dark" ? "Light Mode" : "Dark Mode",
+      id: "theme",
+      custom: true,
+      onClick: toggleTheme
+    },
+>>>>>>> 5333d25 (Fix git setup and gitignore)
   ];
 
   return (
@@ -68,16 +108,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             <span className="text-2xl font-bold tracking-tight text-slate-900">SweatIQ</span>
           </div>
 
+<<<<<<< HEAD
           <nav className="flex-1 space-y-8">
             {/* Main Menu */}
             <div>
               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
               <div className="space-y-2">
                 {mainMenuItems.map((item) => (
+=======
+          {/* Menu Bar */}
+          <div className="flex-1">
+            <div className="text-xs font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">
+              Menu Bar
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+>>>>>>> 5333d25 (Fix git setup and gitignore)
                   <button
                     key={item.id}
                     onClick={() => setActiveItem(item.id)}
                     className={cn(
+<<<<<<< HEAD
                       "flex items-center justify-between w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
                       activeItem === item.id 
                         ? "bg-slate-100 text-slate-900" 
@@ -95,6 +148,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     {activeItem === item.id && (
                       <div className="absolute left-0 top-3 bottom-3 w-1 bg-purple-600 rounded-r-full" />
                     )}
+=======
+                      "flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-cyan-50/30 hover:from-cyan-100 hover:to-cyan-100/30 dark:border-cyan-200/30 dark:from-white/10 dark:to-white/5 dark:hover:from-cyan-300/20 dark:hover:to-cyan-300/10 transition-all group",
+                      item.disabled && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "w-6 h-6 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
+                        item.id === "refresh" && refreshing && "animate-spin"
+                      )}
+                    />
+                    <span className="mt-1 text-[10px] font-semibold text-slate-600 group-hover:text-cyan-600 dark:text-slate-300 dark:group-hover:text-cyan-300">
+                      {item.label}
+                    </span>
+>>>>>>> 5333d25 (Fix git setup and gitignore)
                   </button>
                 ))}
               </div>
