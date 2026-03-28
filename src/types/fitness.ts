@@ -69,3 +69,9 @@ export interface AuthResponse {
   expiresAt: string;
   user: AuthUser;
 }
+
+export interface BotCommand {
+  command: string;
+  response: string;
+  updatedAt: string;
+}
