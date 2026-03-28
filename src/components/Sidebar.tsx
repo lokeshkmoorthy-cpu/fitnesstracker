@@ -15,7 +15,8 @@ import {
   X,
   Moon,
   Sun,
-  RefreshCcw,
+  RefreshCw,
+  Info
 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import type { AuthUser } from "@/src/types/fitness";
@@ -38,56 +39,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     document.documentElement.classList.toggle("dark");
   };
 
+  const mainMenuItems = [
+    { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
+    { icon: Activity, label: "Activity", id: "activity" },
+    { icon: Map, label: "Maps", id: "maps" },
+    { icon: CalendarIcon, label: "Schedule", id: "schedule" },
+    { icon: Target, label: "Goals", id: "goals" },
+  ];
+
+  const accountItems = [
+    { icon: Settings, label: "Settings", id: "settings" },
+    { icon: Info, label: "Help", id: "help" },
+    { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
+  ];
+
   const menuAction = (id: string) => {
     setActiveItem(id);
-    if (id === "support") {
+    if (id === "help" || id === "support") {
       onHelp();
+    }
+    if (id === "refresh" && !refreshing) {
+      onRefresh();
     }
     // Auto-close on mobile
     if (window.innerWidth < 1024) {
       setIsOpen(false);
     }
   };
-
-
-  const menuItems = [
-    {
-      icon: User,
-      label: user.displayName,
-      sublabel: user.role,
-      id: "user",
-      custom: true
-    },
-    {
-      icon: RefreshCw,
-      label: refreshing ? "Syncing..." : "Refresh",
-      id: "refresh",
-      custom: true,
-      onClick: onRefresh,
-      disabled: refreshing
-    },
-    {
-      icon: LogOut,
-      label: "Logout",
-      id: "logout",
-      custom: true,
-      onClick: onLogout
-    },
-    {
-      icon: HelpCircle,
-      label: "Help",
-      id: "help",
-      custom: true,
-      onClick: onHelp
-    },
-    {
-      icon: theme === "dark" ? Sun : Moon,
-      label: theme === "dark" ? "Light Mode" : "Dark Mode",
-      id: "theme",
-      custom: true,
-      onClick: toggleTheme
-    },
-  ];
 
   return (
     <>
@@ -125,19 +103,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     key={item.id}
                     onClick={() => menuAction(item.id)}
                     className={cn(
-                      "flex items-center justify-between w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
+                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
                       activeItem === item.id
                         ? "bg-slate-100 text-slate-900"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                     )}
                   >
-                    <Icon
+                    <item.icon
                       className={cn(
-                        "w-6 h-6 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
-                        item.id === "refresh" && refreshing && "animate-spin"
+                        "w-5 h-5 text-slate-500 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
+                        activeItem === item.id && "text-cyan-600"
                       )}
                     />
-                    <span className="mt-1 text-[10px] font-semibold text-slate-600 group-hover:text-cyan-600 dark:text-slate-300 dark:group-hover:text-cyan-300">
+                    <span className="text-sm font-semibold tracking-tight">
                       {item.label}
                     </span>
                   </button>
@@ -152,13 +130,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 {accountItems.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => setActiveItem(item.id)}
+                    onClick={() => menuAction(item.id)}
                     className={cn(
                       "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800",
                       activeItem === item.id && "bg-slate-100 text-slate-900"
                     )}
                   >
-                    <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+                    <item.icon className={cn(
+                      "w-5 h-5 text-slate-400 group-hover:text-slate-600",
+                      item.id === "refresh" && refreshing && "animate-spin"
+                    )} />
                     <span className="text-sm font-semibold tracking-tight">{item.label}</span>
                   </button>
                 ))}
