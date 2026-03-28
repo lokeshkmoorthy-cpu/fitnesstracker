@@ -104,4 +104,11 @@ export const fitnessApi = {
     }),
   getStreaks: (user: string) =>
     fetchJson<StreaksResponse>(`/api/streaks?user=${encodeURIComponent(user)}`),
+  getBotCommands: () => fetchJson<import("@/src/types/fitness").BotCommand[]>("/api/bot-commands"),
+  updateBotCommand: (command: string, response: string) =>
+    fetchJson<{ success: boolean }>(`/api/bot-commands/${encodeURIComponent(command)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response }),
+    }),
 };

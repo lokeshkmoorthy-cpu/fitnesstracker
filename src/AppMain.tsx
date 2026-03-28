@@ -10,6 +10,7 @@ import { AuthPanel } from "@/src/features/auth/AuthPanel";
 import { FilterPanel } from "@/src/features/dashboard/FilterPanel";
 import { FooterInfoModal, type FooterModalKey } from "@/src/features/dashboard/FooterInfoModal";
 import { GoalsSection, type GoalEditorValues } from "@/src/features/goals/GoalsSection";
+import { WorkoutPanel } from "@/src/features/admin/WorkoutPanel";
 import { exportDashboardPdf } from "@/src/features/reporting/exportDashboardPdf";
 import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/src/features/workouts/utils";
 import { fitnessApi, setAuthToken } from "@/src/services/api";
@@ -366,6 +367,11 @@ export default function AppMain() {
           </section>
 
           <aside className="lg:col-span-4 space-y-6">
+            {authUser?.role === "admin" && (
+              <div className="p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-right-4 duration-700">
+                <WorkoutPanel />
+              </div>
+            )}
             <GoalsSection
               selectedUser={canSelectUser ? filters.user : authUser.displayName}
               goals={goals}

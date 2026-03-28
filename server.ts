@@ -37,6 +37,8 @@ const GOALS_RANGE = `${GOALS_SHEET}!A:K`;
 const USERS_SHEET = "Users";
 const SESSIONS_SHEET = "Sessions";
 const AUDIT_SHEET = "AuditLog";
+const BOT_COMMANDS_SHEET = "BotCommands";
+const BOT_COMMANDS_RANGE = `${BOT_COMMANDS_SHEET}!A:C`;
 
 interface WorkoutRecord {
   userId: string;
@@ -100,6 +102,13 @@ interface SessionRecord {
   revokedAt: string;
   ip: string;
   userAgent: string;
+}
+
+interface BotCommandRecord {
+  rowIndex: number;
+  command: string;
+  response: string;
+  updatedAt: string;
 }
 
 interface SafeUser {
@@ -284,51 +293,76 @@ async function ensureSheetWithHeaders(title: string, headers: string[]) {
 }
 
 async function ensureAuthSheets() {
-  await ensureSheetWithHeaders(USERS_SHEET, [
-    "userId",
-    "email",
-    "passwordHash",
-    "displayName",
-    "role",
-    "isActive",
-    "createdAt",
-    "updatedAt",
-    "lastLoginAt",
-    "telegramChatId",
-    "telegramUsername",
-    "telegramLinkedAt",
-  ]);
-  await ensureSheetWithHeaders(SESSIONS_SHEET, [
-    "sessionId",
-    "userId",
-    "tokenHash",
-    "expiresAt",
-    "createdAt",
-    "revokedAt",
-    "ip",
-    "userAgent",
-  ]);
-  await ensureSheetWithHeaders(AUDIT_SHEET, [
-    "eventId",
-    "userId",
-    "eventType",
-    "targetId",
-    "metadataJson",
-    "createdAt",
-  ]);
-  await ensureSheetWithHeaders(GOALS_SHEET, [
-    "userId",
-    "username",
-    "goalId",
-    "goalName",
-    "period",
-    "stepsGoal",
-    "distanceGoalKm",
-    "caloriesGoal",
-    "activeMinutesGoal",
-    "isActive",
-    "updatedAt",
-  ]);
+  try {
+    console.log("Checking sheets...");
+    await ensureSheetWithHeaders(USERS_SHEET, [
+      "userId",
+      "email",
+      "passwordHash",
+      "displayName",
+      "role",
+      "isActive",
+      "createdAt",
+      "updatedAt",
+      "lastLoginAt",
+      "telegramChatId",
+      "telegramUsername",
+      "telegramLinkedAt",
+    ]);
+    await ensureSheetWithHeaders(SESSIONS_SHEET, [
+      "sessionId",
+      "userId",
+      "tokenHash",
+      "expiresAt",
+      "createdAt",
+      "revokedAt",
+      "ip",
+      "userAgent",
+    ]);
+    await ensureSheetWithHeaders(AUDIT_SHEET, [
+      "eventId",
+      "userId",
+      "eventType",
+      "targetId",
+      "metadataJson",
+      "createdAt",
+    ]);
+    await ensureSheetWithHeaders(GOALS_SHEET, [
+      "userId",
+      "username",
+      "goalId",
+      "goalName",
+      "period",
+      "stepsGoal",
+      "distanceGoalKm",
+      "caloriesGoal",
+      "activeMinutesGoal",
+      "isactive",
+      "updatedat",
+    ]);
+    console.log("Ensuring BotCommands sheet...");
+    await ensureSheetWithHeaders(BOT_COMMANDS_SHEET, ["command", "response", "updatedAt"]);
+    console.log("Fetching existing bot commands...");
+    const existingCommands = await getBotCommands();
+    if (existingCommands.length === 0) {
+      console.log("Populating default bot commands...");
+      const defaults = [
+        ["/chest", "🏋️ CHEST WORKOUT (5 Exercises)\n\n1️⃣ Bench Press\n👉 4 sets × 8–12 reps\n👉 Variation: Incline / Decline\n👉 Tip: Keep your feet planted and control the bar\n\n2️⃣ Push-Ups\n👉 3 sets × 12–20 reps\n👉 Variation: Wide / Diamond\n👉 Tip: Keep body straight, don’t sag hips\n\n3️⃣ Dumbbell Fly\n👉 3 sets × 10–15 reps\n👉 Variation: Incline Fly\n👉 Tip: Slight bend in elbows, stretch chest fully\n\n4️⃣ Chest Dips\n👉 3 sets × 8–12 reps\n👉 Variation: Weighted dips\n👉 Tip: Lean forward to target chest\n\n5️⃣ Cable Crossover\n👉 3 sets × 12–15 reps\n👉 Variation: High to Low / Low to High\n👉 Tip: Squeeze chest at the center\n\n🔥 Focus: Form > Weight\n💧 Rest: 60–90 sec between sets", nowIso()],
+        ["/shoulder", "🏋️ SHOULDER WORKOUT (5 Exercises)\n\n1️⃣ Overhead Press\n👉 4 sets × 8–12 reps\n👉 Variation: Dumbbell / Barbell\n👉 Tip: Keep core tight, avoid arching back\n\n2️⃣ Lateral Raises\n👉 3 sets × 12–15 reps\n👉 Variation: Single-arm / Cable\n👉 Tip: Lift to shoulder level, slow control\n\n3️⃣ Front Raises\n👉 3 sets × 10–12 reps\n👉 Variation: Plate / Dumbbell\n👉 Tip: Don’t swing the weight\n\n4️⃣ Rear Delt Fly\n👉 3 sets × 12–15 reps\n👉 Variation: Machine / Bent-over\n👉 Tip: Focus on rear shoulder squeeze\n\n5️⃣ Arnold Press\n👉 3 sets × 8–10 reps\n👉 Tip: Rotate wrists during press\n\n🔥 Focus: Full shoulder development\n💧 Rest: 60–90 sec", nowIso()],
+        ["/lat", "🏋️ LAT / BACK WORKOUT (5 Exercises)\n\n1️⃣ Pull-Ups\n👉 4 sets × 6–10 reps\n👉 Variation: Wide / Close grip\n👉 Tip: Full stretch & pull\n\n2️⃣ Lat Pulldown\n👉 3 sets × 10–12 reps\n👉 Variation: Wide / Reverse grip\n👉 Tip: Pull to chest, not neck\n\n3️⃣ Seated Row\n👉 3 sets × 10–12 reps\n👉 Variation: Cable / Machine\n👉 Tip: Squeeze shoulder blades\n\n4️⃣ One-arm Dumbbell Row\n👉 3 sets × 10 reps each side\n👉 Tip: Keep back straight\n\n5️⃣ Straight Arm Pulldown\n👉 3 sets × 12–15 reps\n👉 Tip: Focus on lat stretch\n\n🔥 Focus: Width + Thickness\n💧 Rest: 60–90 sec", nowIso()],
+        ["/legs", "🏋️ LEG WORKOUT (5 Exercises)\n\n1️⃣ Squats\n👉 4 sets × 8–12 reps\n👉 Variation: Front / Back squat\n👉 Tip: Keep chest up\n\n2️⃣ Leg Press\n👉 3 sets × 10–15 reps\n👉 Tip: Don’t lock knees\n\n3️⃣ Lunges\n👉 3 sets × 10 each leg\n👉 Variation: Walking / Static\n👉 Tip: Control balance\n\n4️⃣ Leg Curl\n👉 3 sets × 12–15 reps\n👉 Tip: Slow eccentric\n\n5️⃣ Calf Raises\n👉 4 sets × 15–20 reps\n👉 Tip: Full stretch + squeeze\n\n🔥 Focus: Strength + Stability\n💧 Rest: 60–120 sec", nowIso()],
+        ["/bicep", "🏋️ BICEP WORKOUT (5 Exercises)\n\n1️⃣ Barbell Curl\n👉 4 sets × 8–12 reps\n👉 Tip: Don’t swing\n\n2️⃣ Dumbbell Curl\n👉 3 sets × 10–12 reps\n👉 Variation: Alternate\n👉 Tip: Full stretch\n\n3️⃣ Hammer Curl\n👉 3 sets × 10–12 reps\n👉 Tip: Neutral grip\n\n4️⃣ Preacher Curl\n👉 3 sets × 10–12 reps\n👉 Tip: Strict form\n\n5️⃣ Concentration Curl\n👉 3 sets × 10 reps each arm\n👉 Tip: Peak contraction\n\n🔥 Focus: Peak + Thickness\n💧 Rest: 45–60 sec", nowIso()],
+        ["/tricep", "🏋️ TRICEP WORKOUT (5 Exercises)\n\n1️⃣ Tricep Pushdown\n👉 4 sets × 10–12 reps\n👉 Variation: Rope / Bar\n👉 Tip: Full extension\n\n2️⃣ Dips\n👉 3 sets × 8–12 reps\n👉 Tip: Keep body upright\n\n3️⃣ Skull Crushers\n👉 3 sets × 10–12 reps\n👉 Tip: Control movement\n\n4️⃣ Overhead Extension\n👉 3 sets × 10–12 reps\n👉 Variation: Dumbbell / Cable\n👉 Tip: Stretch fully\n\n5️⃣ Close Grip Bench Press\n👉 3 sets × 8–10 reps\n👉 Tip: Keep elbows close\n\n🔥 Focus: Long head activation\n💧 Rest: 45–60 sec", nowIso()],
+      ];
+      for (const row of defaults) {
+        await appendSheetRow(BOT_COMMANDS_RANGE, row);
+      }
+      console.log("Default bot commands populated.");
+    }
+  } catch (error) {
+    console.error("FATAL: Failed to ensure auth sheets:", error);
+    process.exit(1);
+  }
 }
 
 async function getUsers(): Promise<UserRecord[]> {
@@ -601,6 +635,43 @@ function serializeGoalRow(goal: GoalsRecord): Array<string | number> {
   ];
 }
 
+async function getBotCommands(): Promise<BotCommandRecord[]> {
+  const rows = await readSheetRows(BOT_COMMANDS_RANGE);
+  const headers = ["command", "response", "updatedat"];
+  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
+    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
+    return {
+      rowIndex,
+      command: get("command"),
+      response: get("response"),
+      updatedAt: get("updatedat") || nowIso(),
+    };
+  }).filter((cmd) => Boolean(cmd.command));
+}
+
+function serializeBotCommandRow(cmd: BotCommandRecord): Array<string | number> {
+  return [cmd.command, cmd.response, cmd.updatedAt];
+}
+
+async function updateBotCommand(command: string, response: string) {
+  const commands = await getBotCommands();
+  const existing = commands.find((c) => c.command.toLowerCase() === command.toLowerCase());
+  const now = nowIso();
+  if (existing) {
+    const updated: BotCommandRecord = {
+      ...existing,
+      response,
+      updatedAt: now,
+    };
+    await updateSheetRow(
+      `${BOT_COMMANDS_SHEET}!A${existing.rowIndex}:C${existing.rowIndex}`,
+      serializeBotCommandRow(updated)
+    );
+  } else {
+    await appendSheetRow(`${BOT_COMMANDS_SHEET}!A:C`, [command, response, now]);
+  }
+}
+
 function toPublicGoal(goal: GoalsRecord) {
   const { rowIndex, ...publicGoal } = goal;
   return publicGoal;
@@ -778,203 +849,13 @@ if (bot) {
         );
         return;
       }
-      if (command === "/chest") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ CHEST WORKOUT (5 Exercises)
 
-1️⃣ Bench Press
-👉 4 sets × 8–12 reps
-👉 Variation: Incline / Decline
-👉 Tip: Keep your feet planted and control the bar
-
-2️⃣ Push-Ups
-👉 3 sets × 12–20 reps
-👉 Variation: Wide / Diamond
-👉 Tip: Keep body straight, don’t sag hips
-
-3️⃣ Dumbbell Fly
-👉 3 sets × 10–15 reps
-👉 Variation: Incline Fly
-👉 Tip: Slight bend in elbows, stretch chest fully
-
-4️⃣ Chest Dips
-👉 3 sets × 8–12 reps
-👉 Variation: Weighted dips
-👉 Tip: Lean forward to target chest
-
-5️⃣ Cable Crossover
-👉 3 sets × 12–15 reps
-👉 Variation: High to Low / Low to High
-👉 Tip: Squeeze chest at the center
-
-🔥 Focus: Form > Weight
-💧 Rest: 60–90 sec between sets`
-  );
-  return;
-}
-if (command === "/shoulder") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ SHOULDER WORKOUT (5 Exercises)
-
-1️⃣ Overhead Press
-👉 4 sets × 8–12 reps
-👉 Variation: Dumbbell / Barbell
-👉 Tip: Keep core tight, avoid arching back
-
-2️⃣ Lateral Raises
-👉 3 sets × 12–15 reps
-👉 Variation: Single-arm / Cable
-👉 Tip: Lift to shoulder level, slow control
-
-3️⃣ Front Raises
-👉 3 sets × 10–12 reps
-👉 Variation: Plate / Dumbbell
-👉 Tip: Don’t swing the weight
-
-4️⃣ Rear Delt Fly
-👉 3 sets × 12–15 reps
-👉 Variation: Machine / Bent-over
-👉 Tip: Focus on rear shoulder squeeze
-
-5️⃣ Arnold Press
-👉 3 sets × 8–10 reps
-👉 Tip: Rotate wrists during press
-
-🔥 Focus: Full shoulder development
-💧 Rest: 60–90 sec`
-  );
-  return;
-}
-if (command === "/lat") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ LAT / BACK WORKOUT (5 Exercises)
-
-1️⃣ Pull-Ups
-👉 4 sets × 6–10 reps
-👉 Variation: Wide / Close grip
-👉 Tip: Full stretch & pull
-
-2️⃣ Lat Pulldown
-👉 3 sets × 10–12 reps
-👉 Variation: Wide / Reverse grip
-👉 Tip: Pull to chest, not neck
-
-3️⃣ Seated Row
-👉 3 sets × 10–12 reps
-👉 Variation: Cable / Machine
-👉 Tip: Squeeze shoulder blades
-
-4️⃣ One-arm Dumbbell Row
-👉 3 sets × 10 reps each side
-👉 Tip: Keep back straight
-
-5️⃣ Straight Arm Pulldown
-👉 3 sets × 12–15 reps
-👉 Tip: Focus on lat stretch
-
-🔥 Focus: Width + Thickness
-💧 Rest: 60–90 sec`
-  );
-  return;
-}
-if (command === "/legs") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ LEG WORKOUT (5 Exercises)
-
-1️⃣ Squats
-👉 4 sets × 8–12 reps
-👉 Variation: Front / Back squat
-👉 Tip: Keep chest up
-
-2️⃣ Leg Press
-👉 3 sets × 10–15 reps
-👉 Tip: Don’t lock knees
-
-3️⃣ Lunges
-👉 3 sets × 10 each leg
-👉 Variation: Walking / Static
-👉 Tip: Control balance
-
-4️⃣ Leg Curl
-👉 3 sets × 12–15 reps
-👉 Tip: Slow eccentric
-
-5️⃣ Calf Raises
-👉 4 sets × 15–20 reps
-👉 Tip: Full stretch + squeeze
-
-🔥 Focus: Strength + Stability
-💧 Rest: 60–120 sec`
-  );
-  return;
-}
-if (command === "/bicep") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ BICEP WORKOUT (5 Exercises)
-
-1️⃣ Barbell Curl
-👉 4 sets × 8–12 reps
-👉 Tip: Don’t swing
-
-2️⃣ Dumbbell Curl
-👉 3 sets × 10–12 reps
-👉 Variation: Alternate
-👉 Tip: Full stretch
-
-3️⃣ Hammer Curl
-👉 3 sets × 10–12 reps
-👉 Tip: Neutral grip
-
-4️⃣ Preacher Curl
-👉 3 sets × 10–12 reps
-👉 Tip: Strict form
-
-5️⃣ Concentration Curl
-👉 3 sets × 10 reps each arm
-👉 Tip: Peak contraction
-
-🔥 Focus: Peak + Thickness
-💧 Rest: 45–60 sec`
-  );
-  return;
-}
-if (command === "/tricep") {
-  bot?.sendMessage(
-    chatId,
-    `🏋️ TRICEP WORKOUT (5 Exercises)
-
-1️⃣ Tricep Pushdown
-👉 4 sets × 10–12 reps
-👉 Variation: Rope / Bar
-👉 Tip: Full extension
-
-2️⃣ Dips
-👉 3 sets × 8–12 reps
-👉 Tip: Keep body upright
-
-3️⃣ Skull Crushers
-👉 3 sets × 10–12 reps
-👉 Tip: Control movement
-
-4️⃣ Overhead Extension
-👉 3 sets × 10–12 reps
-👉 Variation: Dumbbell / Cable
-👉 Tip: Stretch fully
-
-5️⃣ Close Grip Bench Press
-👉 3 sets × 8–10 reps
-👉 Tip: Keep elbows close
-
-🔥 Focus: Long head activation
-💧 Rest: 45–60 sec`
-  );
-  return;
-}
+      const botCommands = await getBotCommands();
+      const matched = botCommands.find((c) => c.command.toLowerCase() === command);
+      if (matched) {
+        bot?.sendMessage(chatId, matched.response);
+        return;
+      }
 
       if (command === "/link") {
         const email = normalizeEmail(args.join(" "));
@@ -1566,6 +1447,32 @@ app.delete("/api/goals/:goalId", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Delete Goal Error:", error);
     res.status(500).json({ error: "Failed to delete goal" });
+  }
+});
+
+app.get("/api/bot-commands", requireAuth, async (req, res) => {
+  try {
+    const commands = await getBotCommands();
+    res.json(commands.map((c) => ({ command: c.command, response: c.response, updatedAt: c.updatedAt })));
+  } catch (error) {
+    console.error("Fetch Bot Commands Error:", error);
+    res.status(500).json({ error: "Failed to fetch bot commands" });
+  }
+});
+
+app.put("/api/bot-commands/:command", requireAuth, requireRole("admin"), async (req, res) => {
+  const command = req.params.command;
+  const { response } = req.body || {};
+  if (!response) {
+    return res.status(400).json({ error: "response is required" });
+  }
+  try {
+    await updateBotCommand(command, response);
+    await logAuditEvent(req.authUser!.userId, "bot_command_update", command, { response });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Update Bot Command Error:", error);
+    res.status(500).json({ error: "Failed to update bot command" });
   }
 });
 
