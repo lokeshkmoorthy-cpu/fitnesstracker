@@ -1,7 +1,7 @@
 import React from "react";
-import { 
-  Bell, 
-  MessageSquare, 
+import {
+  Bell,
+  MessageSquare,
   ChevronLeft,
   Globe,
   ChevronDown,
@@ -23,8 +23,8 @@ export const TopBar: React.FC<TopBarProps> = ({ title, onRefresh, refreshing }) 
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h2>
-          <button 
+          <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
+          <button
             onClick={onRefresh}
             disabled={refreshing}
             className={cn(

@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 <User className="w-6 h-6 text-slate-400 translate-y-1" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-900 leading-tight">{user.displayName}</span>
+                <span className="text-sm font-bold text-white leading-tight">{user.displayName}</span>
                 <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">{user.email}</span>
               </div>
             </div>

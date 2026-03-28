@@ -130,15 +130,15 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
                 <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Current Streak</p>
-                <p className="mt-2 text-2xl font-semibold">{streaks?.currentStreak ?? 0} days</p>
+                <p className="mt-2 text-1xl font-semibold text-white">{streaks?.currentStreak ?? 0} days</p>
               </div>
               <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
                 <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Longest Streak</p>
-                <p className="mt-2 text-2xl font-semibold">{streaks?.longestStreak ?? 0} days</p>
+                <p className="mt-2 text-1xl font-semibold text-white">{streaks?.longestStreak ?? 0} days</p>
               </div>
               <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
                 <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Today's Status</p>
-                <p className="mt-2 text-2xl font-semibold">{statusLabel}</p>
+                <p className="mt-2 text-1xl font-semibold text-white">{statusLabel}</p>
                 {streaks?.atRisk ? (
                   <p className="mt-1 text-xs text-amber-300 flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -186,20 +186,18 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                       setCreatingNew(false);
                       onSelectGoal(goal.goalId);
                     }}
-                    className={`text-left rounded-lg border px-3 py-2 transition-colors ${
-                      selectedGoalId === goal.goalId && !creatingNew
-                        ? "border-cyan-300/60 bg-cyan-400/10"
-                        : "border-white/10 bg-slate-950/40 hover:border-cyan-200/30"
-                    }`}
+                    className={`text-left rounded-lg border px-3 py-2 transition-colors ${selectedGoalId === goal.goalId && !creatingNew
+                      ? "border-cyan-300/60 bg-cyan-400/10"
+                      : "border-white/10 bg-slate-950/40 hover:border-cyan-200/30"
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-[0.12em] font-mono text-cyan-100">{goal.goalName}</p>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full ${
-                          goal.isActive
-                            ? "bg-emerald-400/20 text-emerald-200 border border-emerald-300/25"
-                            : "bg-slate-500/20 text-slate-300 border border-slate-400/20"
-                        }`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${goal.isActive
+                          ? "bg-emerald-400/20 text-emerald-200 border border-emerald-300/25"
+                          : "bg-slate-500/20 text-slate-300 border border-slate-400/20"
+                          }`}
                       >
                         {goal.isActive ? "Active" : "Paused"}
                       </span>

@@ -11,13 +11,13 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({ userName, onAddCli
     <section className="mb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-2 italic">
+          <h1 className="text-4xl font-bold tracking-tight text-white mb-2 italic">
             Good Morning, <span className="text-purple-600 not-italic">{userName}!</span>
           </h1>
           <p className="text-slate-500 font-medium">Ready to crush your goals today?</p>
         </div>
-        
-        <button 
+
+        <button
           onClick={onAddClick}
           className="flex items-center gap-2 px-6 py-3.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-2xl shadow-lg shadow-purple-100 transition-all font-bold tracking-tight"
         >
@@ -27,13 +27,13 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({ userName, onAddCli
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <HeroProgressCard 
+        <HeroProgressCard
           title="Lower Body"
           progress={65}
           tags={["Cardio", "1 Hour"]}
           icon={<HeartPulse className="w-5 h-5" />}
         />
-        <HeroProgressCard 
+        <HeroProgressCard
           title="Upper Body"
           progress={89}
           tags={["Biceps", "2 Hours"]}
@@ -79,18 +79,18 @@ const HeroProgressCard: React.FC<HeroProgressCardProps> = ({ title, progress, ta
 
       <div className="relative w-24 h-24 flex items-center justify-center">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle 
-            cx="50" cy="50" r="40" 
-            fill="transparent" 
-            stroke="currentColor" 
-            strokeWidth="8" 
+          <circle
+            cx="50" cy="50" r="40"
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth="8"
             className="text-slate-100"
           />
-          <circle 
-            cx="50" cy="50" r="40" 
-            fill="transparent" 
-            stroke="currentColor" 
-            strokeWidth="8" 
+          <circle
+            cx="50" cy="50" r="40"
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth="8"
             strokeDasharray={251.2}
             strokeDashoffset={251.2 * (1 - progress / 100)}
             strokeLinecap="round"
