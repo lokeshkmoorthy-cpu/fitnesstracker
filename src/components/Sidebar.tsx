@@ -5,16 +5,13 @@ import {
   Map,
   Calendar as CalendarIcon,
   Target,
-  LifeBuoy,
   Settings,
   LogOut,
   Bolt,
-  ChevronRight,
+  Users,
   User,
   Menu,
   X,
-  Moon,
-  Sun,
   RefreshCw,
   Info
 } from "lucide-react";
@@ -27,9 +24,10 @@ interface SidebarProps {
   refreshing: boolean;
   onLogout: () => void;
   onHelp: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp, onOpenAdmin }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
   const [isDark, setIsDark] = useState(false);
@@ -145,6 +143,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 ))}
               </div>
             </div>
+
+            {user.role === "admin" && onOpenAdmin && (
+              <div>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Admin</h3>
+                <button
+                  onClick={() => {
+                    setActiveItem("admin");
+                    onOpenAdmin();
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800"
+                >
+                  <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm font-semibold tracking-tight">Admin Console</span>
+                </button>
+              </div>
+            )}
           </nav>
 
           {/* User Profile */}

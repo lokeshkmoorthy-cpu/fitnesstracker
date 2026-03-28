@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Activity, Calendar, Loader2, TrendingUp, Users, Flame, Zap, Bolt, ChevronUp, Plus } from "lucide-react";
+import { Activity, Calendar, Loader2, Flame, Zap, Bolt } from "lucide-react";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { DashboardHero } from "@/src/components/DashboardHero";
@@ -13,7 +13,7 @@ import { AuthPanel } from "@/src/features/auth/AuthPanel";
 import { FilterPanel } from "@/src/features/dashboard/FilterPanel";
 import { FooterInfoModal, type FooterModalKey } from "@/src/features/dashboard/FooterInfoModal";
 import { GoalsSection, type GoalEditorValues } from "@/src/features/goals/GoalsSection";
-import { WorkoutPanel } from "@/src/features/admin/WorkoutPanel";
+import { AdminConsoleModal } from "@/src/components/AdminConsoleModal";
 import { exportDashboardPdf } from "@/src/features/reporting/exportDashboardPdf";
 import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/src/features/workouts/utils";
 import { fitnessApi, setAuthToken } from "@/src/services/api";
@@ -46,7 +46,7 @@ export default function AppMain() {
   const [savingGoals, setSavingGoals] = useState(false);
   const [activeFooterModal, setActiveFooterModal] = useState<FooterModalKey | null>(null);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [isAdminCollapsed, setIsAdminCollapsed] = useState(true);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [filters, setFilters] = useState<DashboardFilters>({
     user: "all",
     muscleGroup: "all",
@@ -55,14 +55,10 @@ export default function AppMain() {
     search: "",
   });
 
-  const workoutPanelRef = useRef<HTMLDivElement>(null);
   const goalsSectionRef = useRef<HTMLDivElement>(null);
 
-  const scrollToAddWorkout = () => {
-    setIsAdminCollapsed(false);
-    setTimeout(() => {
-        workoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+  const openAdminConsole = () => {
+    setIsAdminModalOpen(true);
   };
 
   const scrollToGoals = () => {
@@ -338,13 +334,14 @@ export default function AppMain() {
         <div className="metro-scatter" />
       </div>
 
-      <Sidebar 
-        user={authUser} 
-        onRefresh={fetchWorkouts} 
-        refreshing={refreshing} 
-        onLogout={handleLogout} 
-        onHelp={() => setIsHelpModalOpen(true)} 
-      />
+        <Sidebar 
+          user={authUser} 
+          onRefresh={fetchWorkouts} 
+          refreshing={refreshing} 
+          onLogout={handleLogout} 
+          onHelp={() => setIsHelpModalOpen(true)} 
+          onOpenAdmin={() => setIsAdminModalOpen(true)}
+        />
 
       <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 max-w-[1600px] mx-auto overflow-y-auto">
         <TopBar 
@@ -354,9 +351,9 @@ export default function AppMain() {
         />
         
         <DashboardHero 
-          userName={authUser.displayName} 
-          onAddClick={scrollToAddWorkout}
-        />
+            userName={authUser.displayName} 
+            onAddClick={openAdminConsole}
+          />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-8 space-y-8">
@@ -416,31 +413,6 @@ export default function AppMain() {
               onSetGoalClick={scrollToGoals}
             />
 
-            {authUser?.role === "admin" && (
-              <div ref={workoutPanelRef} className="bg-white dark:bg-white/5 rounded-3xl p-6 shadow-premium border border-slate-50 dark:border-white/10 transition-all scroll-mt-8 group/admin overflow-hidden">
-                <div 
-                   onClick={() => setIsAdminCollapsed(!isAdminCollapsed)}
-                   className="flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-xl group-hover/admin:bg-purple-100 transition-colors">
-                      <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Admin Console</h3>
-                  </div>
-                  <button className="p-2 text-slate-400 hover:text-purple-600 transition-colors">
-                    {isAdminCollapsed ? <Plus className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                  </button>
-                </div>
-                
-                {!isAdminCollapsed && (
-                  <div className="mt-8 animate-in fade-in zoom-in-95 duration-300">
-                    <WorkoutPanel />
-                  </div>
-                )}
-              </div>
-            )}
-
             <div ref={goalsSectionRef} className="scroll-mt-8">
               <GoalsSection
                 selectedUser={canSelectUser ? filters.user : authUser.displayName}
@@ -476,8 +448,9 @@ export default function AppMain() {
         </footer>
       </main>
 
-      <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
-      <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+        <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
+        <AdminConsoleModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
+        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
     </div>
   );
 }
