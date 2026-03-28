@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp } from "lucide-react";
+import { ChevronDown, TrendingUp } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -18,59 +18,73 @@ interface WorkoutChartProps {
 }
 
 export const WorkoutChart: React.FC<WorkoutChartProps> = ({ data }) => {
-  if (!data.length) {
-    return (
-      <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md">
-        <h2 className="font-mono text-xs uppercase tracking-[0.18em] font-bold flex items-center gap-2 text-cyan-200/90">
-          <TrendingUp className="w-4 h-4" />
-          Muscle Group Frequency
-        </h2>
-        <p className="mt-8 text-sm text-slate-400">No data for current filters. Adjust your filter options to see chart insights.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md">
+    <div className="bg-white rounded-3xl p-8 shadow-premium border border-slate-50 h-full flex flex-col">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="font-mono text-xs uppercase tracking-[0.18em] font-bold flex items-center gap-2 text-cyan-200/90">
-          <TrendingUp className="w-4 h-4" />
-          Muscle Group Frequency
-        </h2>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 px-2">Workout Statistic</h2>
+        <button className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all group">
+          <span className="text-sm font-bold text-slate-700">This Week</span>
+          <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
+        </button>
       </div>
-      <div className="h-[300px] w-full">
+
+      <div className="flex-1 w-full min-h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226,232,240,0.2)" />
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fontFamily: "monospace", fill: "#CBD5E1" }}
+              tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }}
+              dy={10}
             />
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fontFamily: "monospace", fill: "#CBD5E1" }}
+              tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} 
             />
-            <Tooltip 
-              cursor={{ fill: "rgba(148, 163, 184, 0.1)" }}
-              contentStyle={{ 
-                borderRadius: "12px", 
-                border: "1px solid rgba(186, 230, 253, 0.35)",
-                fontFamily: "monospace",
-                fontSize: "12px",
-                backgroundColor: "#020617",
-                color: "#E2E8F0"
+            <Tooltip
+              cursor={{ fill: "#f8fafc" }}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="bg-white p-4 shadow-xl border border-slate-50 rounded-2xl text-center">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{payload[0].payload.name}</p>
+                      <p className="text-sm font-bold text-slate-900">Total Calories: {payload[0].value} KCal</p>
+                    </div>
+                  );
+                }
+                return null;
               }}
             />
-            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+            <Bar 
+              dataKey="value" 
+              radius={[6, 6, 6, 6]} 
+              barSize={32}
+            >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={index === Math.floor(data.length / 2) ? "#7c3aed" : "#a78bfa"} 
+                  fillOpacity={index === Math.floor(data.length / 2) ? 1 : 0.6}
+                  className="transition-all duration-300 hover:fill-purple-700"
+                />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </div>
+      
+      <div className="mt-4 flex items-center justify-center gap-6">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-purple-200" />
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target</span>
+        </div>
       </div>
     </div>
   );

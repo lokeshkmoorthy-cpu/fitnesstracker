@@ -1,6 +1,19 @@
 import React, { useState } from "react";
-import { Menu, X, BarChart3, Dumbbell, Target, Moon, Sun, RefreshCw, LogOut, User, HelpCircle } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { 
+  LayoutDashboard, 
+  Activity, 
+  Map, 
+  Calendar as CalendarIcon, 
+  Target, 
+  LifeBuoy, 
+  Settings, 
+  LogOut, 
+  Bolt, 
+  ChevronRight,
+  User,
+  Menu,
+  X
+} from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import type { AuthUser } from "@/src/types/fitness";
 
@@ -14,113 +27,125 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const [activeItem, setActiveItem] = useState("dashboard");
 
-  const menuItems = [
-    { icon: BarChart3, label: "Dashboard", id: "dashboard" },
-    { icon: Dumbbell, label: "Workouts", id: "workouts" },
-    { icon: Target, label: "Goals", id: "goals" },
-    {
-      icon: User,
-      label: user.displayName,
-      sublabel: user.role,
-      id: "user",
-      custom: true
-    },
-    {
-      icon: RefreshCw,
-      label: refreshing ? "Syncing..." : "Refresh",
-      id: "refresh",
-      custom: true,
-      onClick: onRefresh,
-      disabled: refreshing
-    },
-    {
-      icon: LogOut,
-      label: "Logout",
-      id: "logout",
-      custom: true,
-      onClick: onLogout
-    },
-    {
-      icon: HelpCircle,
-      label: "Help",
-      id: "help",
-      custom: true,
-      onClick: onHelp
-    },
-    {
-      icon: theme === "dark" ? Sun : Moon,
-      label: theme === "dark" ? "Light Mode" : "Dark Mode",
-      id: "theme",
-      custom: true,
-      onClick: toggleTheme
-    },
+  const mainMenuItems = [
+    { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
+    { icon: Activity, label: "Exercise", id: "exercise", hasSubmenu: true },
+    { icon: Map, label: "Run Tracker", id: "run" },
+    { icon: CalendarIcon, label: "Calendar", id: "calendar" },
+    { icon: Target, label: "Fitness Goals", id: "goals", hasSubmenu: true },
+  ];
+
+  const accountItems = [
+    { icon: LifeBuoy, label: "Support", id: "support" },
+    { icon: Settings, label: "Settings", id: "settings" },
   ];
 
   return (
     <>
-      {/* Toggle Button */}
+      {/* Mobile Toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-30 lg:hidden p-2 rounded-lg border border-cyan-300/40 bg-cyan-50 hover:bg-cyan-100 dark:border-cyan-200/30 dark:bg-white/5 dark:hover:bg-cyan-300/15 transition-all"
+        className="fixed top-4 left-4 z-50 lg:hidden p-2 bg-white rounded-lg shadow-premium border border-slate-100"
       >
         {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed left-0 top-0 h-screen w-64 bg-white/95 border-r border-slate-200 dark:bg-[#07080D]/95 dark:border-white/10 z-20 transition-transform duration-300 ${
+        className={cn(
+          "fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-100 z-40 transition-transform duration-300 lg:translate-x-0 lg:static",
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:static lg:translate-x-0 lg:top-0 lg:h-screen`}
+        )}
       >
-        <div className="p-6 space-y-6 h-full flex flex-col">
+        <div className="flex flex-col h-full p-8">
           {/* Logo Section */}
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-cyan-300 to-fuchsia-400 p-2.5 rounded-lg shadow-[0_0_24px_rgba(34,211,238,0.35)]">
-              <Dumbbell className="text-[#07080D] w-5 h-5" />
+          <div className="flex items-center gap-3 mb-12">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-purple-200">
+              <Bolt className="text-white w-6 h-6 fill-white/20" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight uppercase text-slate-900 dark:text-white">Fit Tracker</h1>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Realtime workout intelligence</p>
-            </div>
+            <span className="text-2xl font-bold tracking-tight text-slate-900">SweatIQ</span>
           </div>
 
-          {/* Square Menu Grid */}
-          <div className="flex-1">
-            <div className="text-xs font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">
-              Quick Access
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
+          <nav className="flex-1 space-y-8">
+            {/* Main Menu */}
+            <div>
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
+              <div className="space-y-2">
+                {mainMenuItems.map((item) => (
                   <button
                     key={item.id}
-                    onClick={item.onClick}
-                    disabled={item.disabled}
-                    aria-label={item.label}
+                    onClick={() => setActiveItem(item.id)}
                     className={cn(
-                      "flex items-center justify-center w-full aspect-square rounded-lg border border-cyan-300/40 bg-gradient-to-br from-cyan-50 to-cyan-50/30 hover:from-cyan-100 hover:to-cyan-100/30 dark:border-cyan-200/30 dark:from-white/10 dark:to-white/5 dark:hover:from-cyan-300/20 dark:hover:to-cyan-300/10 transition-all group",
-                      item.disabled && "opacity-50 cursor-not-allowed"
+                      "flex items-center justify-between w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
+                      activeItem === item.id 
+                        ? "bg-slate-100 text-slate-900" 
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                     )}
                   >
-                    <Icon className={cn(
-                      "w-6 h-6 text-slate-600 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
-                      item.id === "refresh" && refreshing && "animate-spin"
-                    )} />
+                    <div className="flex items-center gap-3.5">
+                      <item.icon className={cn(
+                        "w-5 h-5 transition-colors",
+                        activeItem === item.id ? "text-purple-600" : "text-slate-400 group-hover:text-slate-600"
+                      )} />
+                      <span className="text-sm font-semibold tracking-tight">{item.label}</span>
+                    </div>
+                    {item.hasSubmenu && <ChevronRight className="w-4 h-4 opacity-50" />}
+                    {activeItem === item.id && (
+                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-purple-600 rounded-r-full" />
+                    )}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
+
+            {/* Account */}
+            <div>
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Account</h3>
+              <div className="space-y-2">
+                {accountItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveItem(item.id)}
+                    className={cn(
+                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                      activeItem === item.id && "bg-slate-100 text-slate-900"
+                    )}
+                  >
+                    <item.icon className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+                    <span className="text-sm font-semibold tracking-tight">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </nav>
+
+          {/* User Profile */}
+          <div className="mt-auto pt-8 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                <User className="w-6 h-6 text-slate-400 translate-y-1" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-900 leading-tight">{user.displayName}</span>
+                <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">{user.email}</span>
+              </div>
+            </div>
+            <button 
+              onClick={onLogout}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* Mobile Overlay */}
+      {/* Overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-10 lg:hidden"
+        <div 
+          className="fixed inset-0 bg-slate-900/10 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}

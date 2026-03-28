@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, Loader2, TrendingUp } from "lucide-react";
+import { Activity, Calendar, Loader2, TrendingUp, Users, Flame, Zap, Bolt } from "lucide-react";
 import { Sidebar } from "@/src/components/Sidebar";
+import { TopBar } from "@/src/components/TopBar";
+import { DashboardHero } from "@/src/components/DashboardHero";
+import { GoalProgressCard } from "@/src/components/GoalProgressCard";
 import { HelpModal } from "@/src/components/HelpModal";
 import { StatCard } from "@/src/components/StatCard";
 import { WorkoutChart } from "@/src/components/WorkoutChart";
@@ -289,8 +292,8 @@ export default function AppMain() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#07080D] light-theme:bg-white flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-[#6FFFE9] light-theme:text-cyan-600" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
       </div>
     );
   }
@@ -301,45 +304,65 @@ export default function AppMain() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center dark:bg-[#07080D] p-6">
-        <div className="w-full max-w-5xl animate-pulse space-y-6">
-          <div className="h-16 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 space-y-6">
-              <div className="h-24 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="h-24 rounded-xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-                <div className="h-24 rounded-xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-                <div className="h-24 rounded-xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-              </div>
-              <div className="h-72 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-              <div className="h-56 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-            </div>
-            <div className="lg:col-span-4 space-y-6">
-              <div className="h-80 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-              <div className="h-44 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-white/10" />
-            </div>
-          </div>
-          <p className="font-mono text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-300/70 text-center">
-            Initializing...
-          </p>
+      <div className="min-h-screen bg-[#f9fafb] flex items-center justify-center p-6">
+        <div className="w-full max-w-6xl animate-pulse space-y-8">
+           <div className="h-20 bg-white rounded-3xl" />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-48 bg-white rounded-3xl" />
+              <div className="h-48 bg-white rounded-3xl" />
+           </div>
+           <div className="h-96 bg-white rounded-3xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative bg-white text-slate-900 dark:bg-[#07080D] dark:text-slate-100 font-sans selection:bg-cyan-500/60 selection:text-white overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(65,204,255,0.2),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(182,97,255,0.2),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(26,255,168,0.18),transparent_35%)] dark:hidden" />
-        <div className="absolute inset-0 dark:bg-[radial-gradient(circle_at_25%_15%,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_70%_15%,rgba(168,85,247,0.16),transparent_30%),radial-gradient(circle_at_50%_95%,rgba(16,185,129,0.22),transparent_35%)]" />
+    <div className="min-h-screen bg-[#f8f9fa] flex font-sans overflow-x-hidden">
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div className="metro-scatter" />
       </div>
 
-      <div className="flex">
-        <Sidebar user={authUser} onRefresh={fetchWorkouts} refreshing={refreshing} onLogout={handleLogout} onHelp={() => setIsHelpModalOpen(true)} />
-        <main className="relative flex-1 max-w-9xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <section className="lg:col-span-8 space-y-6">
+      <Sidebar 
+        user={authUser} 
+        onRefresh={fetchWorkouts} 
+        refreshing={refreshing} 
+        onLogout={handleLogout} 
+        onHelp={() => setIsHelpModalOpen(true)} 
+      />
+
+      <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 max-w-[1600px] mx-auto overflow-y-auto">
+        <TopBar title="Dashboard" />
+        
+        <DashboardHero userName={authUser.displayName} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-8 space-y-8">
+            {/* Quick Metrics Integration */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatCard 
+                label="Total Exercises" 
+                value={filteredWorkouts.length} 
+                icon={<Activity className="w-5 h-5" />} 
+                trend="+12%"
+                subtitle="From last week"
+              />
+              <StatCard 
+                label="Active Time" 
+                value={`${Math.round(filteredWorkouts.length * 0.75)}h`} 
+                icon={<Flame className="w-5 h-5" />} 
+                trend="+5%"
+                subtitle="Total activity"
+              />
+              <StatCard 
+                label="Workout Days" 
+                value={new Set(filteredWorkouts.map((w) => w.date)).size} 
+                icon={<Zap className="w-5 h-5" />} 
+                trend="+2"
+                subtitle="Consistency"
+              />
+            </div>
+
             <FilterPanel
               filters={filters}
               users={workoutFilterOptions.users}
@@ -351,27 +374,38 @@ export default function AppMain() {
               onExportPdf={exportReportToPdf}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard label="Visible Workouts" value={filteredWorkouts.length} icon={<Activity className="w-4 h-4" />} />
-              <StatCard label="Muscle Groups" value={chartData.length} icon={<TrendingUp className="w-4 h-4" />} />
-              <StatCard
-                label="Active Days"
-                value={new Set(filteredWorkouts.map((workout) => workout.date)).size}
-                icon={<Calendar className="w-4 h-4" />}
-              />
-            </div>
-
-            <ActivitySection activity={activity} />
             <WorkoutChart data={chartData} />
-            <WorkoutTable workouts={filteredWorkouts} />
-          </section>
+            
+            <WorkoutTable 
+              workouts={filteredWorkouts} 
+              searchQuery={filters.search}
+              onSearchChange={(search) => setFilters(p => ({ ...p, search }))}
+              filterValue={filters.muscleGroup}
+              onFilterChange={(muscleGroup) => setFilters(p => ({ ...p, muscleGroup }))}
+            />
+            
+            <ActivitySection activity={activity} />
+          </div>
 
-          <aside className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 space-y-8">
+            <GoalProgressCard 
+              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)} 
+              total={selectedGoal?.stepsGoal || 10000} 
+              label=" Steps" 
+            />
+
             {authUser?.role === "admin" && (
-              <div className="p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-right-4 duration-700">
+              <div className="bg-white rounded-3xl p-8 shadow-premium border border-slate-50 transition-all">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-purple-50 rounded-xl">
+                    <Users className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">Admin Console</h3>
+                </div>
                 <WorkoutPanel />
               </div>
             )}
+
             <GoalsSection
               selectedUser={canSelectUser ? filters.user : authUser.displayName}
               goals={goals}
@@ -384,42 +418,29 @@ export default function AppMain() {
               onUpdate={updateGoal}
               onDelete={deleteGoal}
             />
-          </aside>
-        </main>
-      </div>
+          </div>
+        </div>
+
+        <footer className="mt-20 pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+                <Bolt className="w-4 h-4 text-white fill-white/20" />
+             </div>
+             <span className="text-sm font-bold text-slate-900 tracking-tight">SweatIQ Dashboard</span>
+          </div>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            Powered by Fitness Intelligence Team
+          </p>
+          <div className="flex gap-8">
+            <button onClick={() => setActiveFooterModal("documentation")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Docs</button>
+            <button onClick={() => setActiveFooterModal("privacy")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Privacy</button>
+            <button onClick={() => setActiveFooterModal("support")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Support</button>
+          </div>
+        </footer>
+      </main>
 
       <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
-
       <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
-
-      <footer className="relative max-w-7xl mx-auto p-12 border-t border-slate-200 dark:border-white/10 mt-12 flex flex-col md:flex-row justify-between items-center gap-6 bg-white dark:bg-[#07080D]">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">
-          Powered by Goalplay Intern&apos;s Team
-        </div>
-        <div className="flex gap-8">
-          <button
-            type="button"
-            onClick={() => setActiveFooterModal("documentation")}
-            className="font-mono text-[10px] uppercase tracking-widest text-slate-500 hover:text-cyan-600 dark:text-slate-400 dark:hover:text-cyan-200 transition-colors"
-          >
-            Documentation
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFooterModal("privacy")}
-            className="font-mono text-[10px] uppercase tracking-widest text-slate-500 hover:text-cyan-600 dark:text-slate-400 dark:hover:text-cyan-200 transition-colors"
-          >
-            Privacy
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFooterModal("support")}
-            className="font-mono text-[10px] uppercase tracking-widest text-slate-500 hover:text-cyan-600 dark:text-slate-400 dark:hover:text-cyan-200 transition-colors"
-          >
-            Support
-          </button>
-        </div>
-      </footer>
     </div>
   );
 }
