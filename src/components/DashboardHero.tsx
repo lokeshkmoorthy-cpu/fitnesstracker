@@ -11,15 +11,15 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({ userName, onAddCli
     <section className="mb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-white mb-2 italic">
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-2 italic">
             Good Morning, <span className="text-purple-600 not-italic">{userName}!</span>
           </h1>
-          <p className="text-slate-500 font-medium">Ready to crush your goals today?</p>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Ready to crush your goals today?</p>
         </div>
 
         <button
           onClick={onAddClick}
-          className="flex items-center gap-2 px-6 py-3.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-2xl shadow-lg shadow-purple-100 transition-all font-bold tracking-tight"
+          className="flex items-center gap-2 px-6 py-3.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-2xl shadow-lg shadow-purple-100 dark:shadow-none transition-all font-bold tracking-tight"
         >
           <Plus className="w-5 h-5" />
           Add Exercise
@@ -53,20 +53,20 @@ interface HeroProgressCardProps {
 
 const HeroProgressCard: React.FC<HeroProgressCardProps> = ({ title, progress, tags, icon }) => {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-premium border border-slate-50 flex items-center justify-between group hover:shadow-card-hover transition-all cursor-pointer">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-premium border border-slate-50 dark:border-white/5 flex items-center justify-between group hover:shadow-card-hover transition-all cursor-pointer">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 rounded-xl group-hover:bg-purple-100 transition-colors text-purple-600">
+          <div className="p-2.5 bg-purple-50 dark:bg-purple-500/20 rounded-xl group-hover:bg-purple-100 transition-colors text-purple-600 dark:text-purple-400">
             {icon}
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold text-slate-400 leading-tight">Progress</span>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">{title}</span>
+            <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">{title}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {tags.map((tag, i) => (
-            <span key={i} className="text-[11px] font-bold px-3 py-1 bg-slate-50 text-purple-600 border border-slate-100 rounded-lg group-hover:bg-white transition-colors">
+            <span key={i} className="text-[11px] font-bold px-3 py-1 bg-slate-50 dark:bg-slate-800/50 text-purple-600 dark:text-purple-400 border border-slate-100 dark:border-white/10 rounded-lg group-hover:bg-white dark:group-hover:bg-slate-900 transition-colors">
               {tag}
             </span>
           ))}
@@ -84,7 +84,7 @@ const HeroProgressCard: React.FC<HeroProgressCardProps> = ({ title, progress, ta
             fill="transparent"
             stroke="currentColor"
             strokeWidth="8"
-            className="text-slate-100"
+            className="text-slate-100 dark:text-slate-800"
           />
           <circle
             cx="50" cy="50" r="40"
@@ -98,7 +98,7 @@ const HeroProgressCard: React.FC<HeroProgressCardProps> = ({ title, progress, ta
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold text-slate-900">{progress}%</span>
+          <span className="text-lg font-bold text-slate-900 dark:text-white">{progress}%</span>
         </div>
       </div>
     </div>

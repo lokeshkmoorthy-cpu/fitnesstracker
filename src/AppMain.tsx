@@ -13,6 +13,8 @@ import { AuthPanel } from "@/src/features/auth/AuthPanel";
 import { FilterPanel } from "@/src/features/dashboard/FilterPanel";
 import { FooterInfoModal, type FooterModalKey } from "@/src/features/dashboard/FooterInfoModal";
 import { GoalsSection, type GoalEditorValues } from "@/src/features/goals/GoalsSection";
+import { MapsView } from "@/src/features/maps/MapsView";
+import { ScheduleView } from "@/src/features/schedule/ScheduleView";
 import { AdminConsoleModal } from "@/src/components/AdminConsoleModal";
 import { exportDashboardPdf } from "@/src/features/reporting/exportDashboardPdf";
 import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/src/features/workouts/utils";
@@ -54,6 +56,8 @@ export default function AppMain() {
     endDate: "",
     search: "",
   });
+
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   const goalsSectionRef = useRef<HTMLDivElement>(null);
 
@@ -341,23 +345,33 @@ export default function AppMain() {
         onLogout={handleLogout}
         onHelp={() => setIsHelpModalOpen(true)}
         onOpenAdmin={() => setIsAdminModalOpen(true)}
+        activeItem={activeTab}
+        onNavigate={setActiveTab}
       />
 
-      <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 max-w-[1600px] mx-auto overflow-y-auto">
+      <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 overflow-y-auto">
         <TopBar
-          title="Dashboard"
+          title={
+            activeTab === "dashboard" ? "Dashboard" :
+            activeTab === "activity" ? "Activity" :
+            activeTab === "maps" ? "Maps" :
+            activeTab === "schedule" ? "Schedule" :
+            activeTab === "goals" ? "Goals" : "Dashboard"
+          }
           onRefresh={fetchWorkouts}
           refreshing={refreshing}
         />
 
-        <DashboardHero
-          userName={authUser.displayName}
-          onAddClick={openAdminConsole}
-        />
+        {activeTab === "dashboard" && (
+          <>
+            <DashboardHero
+              userName={authUser.displayName}
+              onAddClick={openAdminConsole}
+            />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard
                 label="Total Exercises"
                 value={filteredWorkouts.length}
@@ -429,6 +443,59 @@ export default function AppMain() {
             </div>
           </div>
         </div>
+        </>
+        )}
+
+        {activeTab === "activity" && (
+          <div className="mt-8 space-y-8">
+            <FilterPanel
+              filters={filters}
+              users={workoutFilterOptions.users}
+              muscleGroups={workoutFilterOptions.muscleGroups}
+              canSelectUser={canSelectUser}
+              exportingPdf={exportingPdf}
+              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+              onClear={clearFilters}
+              onExportPdf={exportReportToPdf}
+            />
+            <ActivitySection activity={activity} />
+          </div>
+        )}
+
+        {activeTab === "maps" && (
+          <div className="mt-8">
+            <MapsView />
+          </div>
+        )}
+
+        {activeTab === "schedule" && (
+          <div className="mt-8">
+            <ScheduleView />
+          </div>
+        )}
+
+        {activeTab === "goals" && (
+          <div className="mt-8 space-y-8">
+            <GoalProgressCard
+              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)}
+              total={selectedGoal?.stepsGoal || 10000}
+              label=" Steps"
+              onSetGoalClick={scrollToGoals}
+            />
+            <GoalsSection
+              selectedUser={canSelectUser ? filters.user : authUser.displayName}
+              goals={goals}
+              selectedGoalId={selectedGoalId}
+              streaks={streaks}
+              userWiseGoals={userWiseGoals}
+              saving={savingGoals}
+              onSelectGoal={setSelectedGoalId}
+              onCreate={createGoal}
+              onUpdate={updateGoal}
+              onDelete={deleteGoal}
+            />
+          </div>
+        )}
 
         <footer className="mt-20 pt-12 border-t border-slate-100 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
           <div className="flex items-center gap-3">

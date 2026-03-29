@@ -97,8 +97,8 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
 
   return (
     <section className="space-y-6">
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md">
-        <h2 className="font-mono text-xs uppercase tracking-[0.18em] font-bold text-cyan-200/90 mb-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-50 dark:border-white/5 rounded-2xl p-5 shadow-premium dark:shadow-none transition-all">
+        <h2 className="font-mono text-xs uppercase tracking-[0.18em] font-bold text-cyan-700 dark:text-cyan-200/90 mb-4">
           Goals & Streaks
         </h2>
         {selectedUser === "all" ? (
@@ -107,18 +107,18 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
               <p className="text-sm text-slate-400">No user-wise goals available yet.</p>
             ) : (
               userWiseGoals.map((entry) => (
-                <div key={entry.username} className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
+                <div key={entry.username} className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-white/10 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs uppercase font-mono tracking-[0.15em] text-cyan-200">{entry.username}</p>
-                    <p className="text-[10px] uppercase font-mono tracking-[0.14em] text-slate-400">
+                    <p className="text-xs uppercase font-mono tracking-[0.15em] text-cyan-600 dark:text-cyan-200">{entry.username}</p>
+                    <p className="text-[10px] uppercase font-mono tracking-[0.14em] text-slate-500 dark:text-slate-400">
                       {entry.goals.filter((goal) => goal.isActive).length} active / {entry.goals.length} total
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <p className="text-slate-300">Goal records: <span className="text-slate-100">{entry.goals.length}</span></p>
-                    <p className="text-slate-300">Active goals: <span className="text-slate-100">{entry.goals.filter((goal) => goal.isActive).length}</span></p>
-                    <p className="text-slate-300">Current Streak: <span className="text-slate-100">{entry.streaks?.currentStreak ?? 0}d</span></p>
-                    <p className="text-slate-300">Longest Streak: <span className="text-slate-100">{entry.streaks?.longestStreak ?? 0}d</span></p>
+                    <p className="text-slate-600 dark:text-slate-300">Goal records: <span className="text-slate-900 dark:text-slate-100 font-bold">{entry.goals.length}</span></p>
+                    <p className="text-slate-600 dark:text-slate-300">Active goals: <span className="text-slate-900 dark:text-slate-100 font-bold">{entry.goals.filter((goal) => goal.isActive).length}</span></p>
+                    <p className="text-slate-600 dark:text-slate-300">Current Streak: <span className="text-slate-900 dark:text-slate-100 font-bold">{entry.streaks?.currentStreak ?? 0}d</span></p>
+                    <p className="text-slate-600 dark:text-slate-300">Longest Streak: <span className="text-slate-900 dark:text-slate-100 font-bold">{entry.streaks?.longestStreak ?? 0}d</span></p>
                   </div>
                 </div>
               ))
@@ -128,17 +128,17 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
         {selectedUser !== "all" ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Current Streak</p>
-                <p className="mt-2 text-1xl font-semibold text-white">{streaks?.currentStreak ?? 0} days</p>
+              <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-white/10 rounded-xl p-4">
+                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-500 dark:text-slate-400">Current Streak</p>
+                <p className="mt-2 text-1xl font-semibold text-slate-900 dark:text-white">{streaks?.currentStreak ?? 0} days</p>
               </div>
-              <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Longest Streak</p>
-                <p className="mt-2 text-1xl font-semibold text-white">{streaks?.longestStreak ?? 0} days</p>
+              <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-white/10 rounded-xl p-4">
+                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-500 dark:text-slate-400">Longest Streak</p>
+                <p className="mt-2 text-1xl font-semibold text-slate-900 dark:text-white">{streaks?.longestStreak ?? 0} days</p>
               </div>
-              <div className="bg-slate-950/50 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-400">Today's Status</p>
-                <p className="mt-2 text-1xl font-semibold text-white">{statusLabel}</p>
+              <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-white/10 rounded-xl p-4">
+                <p className="text-[10px] uppercase font-mono tracking-[0.15em] text-slate-500 dark:text-slate-400">Today's Status</p>
+                <p className="mt-2 text-1xl font-semibold text-slate-900 dark:text-white">{statusLabel}</p>
                 {streaks?.atRisk ? (
                   <p className="mt-1 text-xs text-amber-300 flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -149,7 +149,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
             </div>
 
             <div className="flex items-center justify-between mb-4">
-              <p className="text-xs text-slate-400">Create and manage multiple goals for this user.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Create and manage multiple goals for this user.</p>
               <button
                 type="button"
                 disabled={saving}
@@ -165,7 +165,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                     isActive: true,
                   });
                 }}
-                className="h-9 px-3 rounded-lg bg-cyan-300/15 border border-cyan-200/35 text-cyan-100 text-xs uppercase font-mono tracking-[0.14em] flex items-center gap-2 disabled:opacity-60"
+                className="h-9 px-3 rounded-lg bg-cyan-50 dark:bg-cyan-300/15 border border-cyan-200 dark:border-cyan-200/35 text-cyan-600 dark:text-cyan-100 text-xs uppercase font-mono tracking-[0.14em] flex items-center gap-2 disabled:opacity-60 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Create goal
@@ -174,7 +174,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
 
             <div className="grid grid-cols-1 gap-2 mb-5 max-h-52 overflow-auto pr-1">
               {goals.length === 0 ? (
-                <p className="text-xs text-slate-400 border border-dashed border-white/10 rounded-lg p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-white/10 rounded-lg p-3">
                   No goals created yet.
                 </p>
               ) : (
@@ -187,12 +187,12 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                       onSelectGoal(goal.goalId);
                     }}
                     className={`text-left rounded-lg border px-3 py-2 transition-colors ${selectedGoalId === goal.goalId && !creatingNew
-                      ? "border-cyan-300/60 bg-cyan-400/10"
-                      : "border-white/10 bg-slate-950/40 hover:border-cyan-200/30"
+                      ? "border-cyan-300 bg-cyan-50 dark:border-cyan-300/60 dark:bg-cyan-400/10"
+                      : "border-slate-100 bg-slate-50 hover:border-cyan-200 dark:border-white/10 dark:bg-slate-950/40 dark:hover:border-cyan-200/30"
                       }`}
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-[0.12em] font-mono text-cyan-100">{goal.goalName}</p>
+                      <p className="text-xs uppercase tracking-[0.12em] font-mono text-cyan-700 dark:text-cyan-100">{goal.goalName}</p>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full ${goal.isActive
                           ? "bg-emerald-400/20 text-emerald-200 border border-emerald-300/25"

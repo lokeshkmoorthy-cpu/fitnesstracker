@@ -13,7 +13,9 @@ import {
   Menu,
   X,
   RefreshCw,
-  Info
+  Info,
+  Sun,
+  Moon
 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import type { AuthUser } from "@/src/types/fitness";
@@ -25,16 +27,31 @@ interface SidebarProps {
   onLogout: () => void;
   onHelp: () => void;
   onOpenAdmin?: () => void;
+  activeItem: string;
+  onNavigate: (id: string) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp, onOpenAdmin }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp, onOpenAdmin, activeItem, onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState("dashboard");
   const [isDark, setIsDark] = useState(false);
 
+  React.useEffect(() => {
+    // Check initial state applied by index.html script
+    if (document.documentElement.classList.contains("dark")) {
+      setIsDark(true);
+    }
+  }, []);
+
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
+    const isDarkMode = !isDark;
+    setIsDark(isDarkMode);
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
   };
 
   const mainMenuItems = [
@@ -52,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
   ];
 
   const menuAction = (id: string) => {
-    setActiveItem(id);
+    onNavigate(id);
     if (id === "help" || id === "support") {
       onHelp();
     }
@@ -141,6 +158,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     <span className="text-sm font-semibold tracking-tight">{item.label}</span>
                   </button>
                 ))}
+                
+                <button
+                  onClick={toggleTheme}
+                  className="flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
+                >
+                  {isDark ? (
+                    <Sun className="w-5 h-5 text-slate-400 group-hover:text-amber-500" />
+                  ) : (
+                    <Moon className="w-5 h-5 text-slate-400 group-hover:text-amber-500" />
+                  )}
+                  <span className="text-sm font-semibold tracking-tight">
+                    {isDark ? "Light Mode" : "Dark Mode"}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -149,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Admin</h3>
                 <button
                   onClick={() => {
-                    setActiveItem("admin");
+                    onNavigate("admin");
                     onOpenAdmin();
                     if (window.innerWidth < 1024) {
                       setIsOpen(false);

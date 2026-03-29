@@ -19,11 +19,11 @@ interface WorkoutChartProps {
 
 export const WorkoutChart: React.FC<WorkoutChartProps> = ({ data }) => {
   return (
-    <div className="bg-white rounded-3xl p-8 shadow-premium border border-slate-50 h-full flex flex-col">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-premium border border-slate-50 dark:border-white/5 h-full flex flex-col">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 px-2">Workout Statistic</h2>
-        <button className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all group">
-          <span className="text-sm font-bold text-slate-700">This Week</span>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white px-2">Workout Statistic</h2>
+        <button className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/10 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 transition-all group">
+          <span className="text-sm font-bold text-slate-700 dark:text-white">This Week</span>
           <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
         </button>
       </div>
@@ -49,9 +49,9 @@ export const WorkoutChart: React.FC<WorkoutChartProps> = ({ data }) => {
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-white p-4 shadow-xl border border-slate-50 rounded-2xl text-center">
+                    <div className="bg-white dark:bg-slate-800 p-4 shadow-xl border border-slate-50 dark:border-white/10 rounded-2xl text-center">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{payload[0].payload.name}</p>
-                      <p className="text-sm font-bold text-slate-900">Total Calories: {payload[0].value} KCal</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">Total Calories: {payload[0].value} KCal</p>
                     </div>
                   );
                 }
@@ -82,7 +82,7 @@ export const WorkoutChart: React.FC<WorkoutChartProps> = ({ data }) => {
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-purple-200" />
+          <div className="w-2.5 h-2.5 rounded-full bg-purple-200 dark:bg-purple-900/40" />
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target</span>
         </div>
       </div>
