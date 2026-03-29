@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Activity, Calendar, Loader2, Flame, Zap, Bolt } from "lucide-react";
+import { Activity, Loader2, Flame, Zap } from "lucide-react";
+import { ActivityTrendChart } from "@/src/features/activity/ActivityTrendChart";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { DashboardHero } from "@/src/components/DashboardHero";
@@ -56,24 +57,17 @@ export default function AppMain() {
     endDate: "",
     search: "",
   });
-
   const [activeTab, setActiveTab] = useState("dashboard");
-
   const goalsSectionRef = useRef<HTMLDivElement>(null);
 
-  const openAdminConsole = () => {
-    setIsAdminModalOpen(true);
-  };
-
-  const scrollToGoals = () => {
-    goalsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const openAdminConsole = () => setIsAdminModalOpen(true);
+  const scrollToGoals = () => goalsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
 
   const workoutFilterOptions = useMemo(() => buildWorkoutFilters(workouts), [workouts]);
   const filteredWorkouts = useMemo(() => filterWorkouts(workouts, filters), [workouts, filters]);
   const chartData = useMemo(() => aggregateMuscleGroups(filteredWorkouts), [filteredWorkouts]);
   const selectedGoal = useMemo(
-    () => goals.find((goal) => goal.goalId === selectedGoalId) ?? goals[0] ?? null,
+    () => goals.find((g) => g.goalId === selectedGoalId) ?? goals[0] ?? null,
     [goals, selectedGoalId]
   );
   const canSelectUser = authUser?.role === "admin";
@@ -81,10 +75,7 @@ export default function AppMain() {
   useEffect(() => {
     const restoreSession = async () => {
       const token = localStorage.getItem(AUTH_TOKEN_KEY) || "";
-      if (!token) {
-        setAuthLoading(false);
-        return;
-      }
+      if (!token) { setAuthLoading(false); return; }
       try {
         setAuthToken(token);
         const me = await fitnessApi.me();
@@ -132,18 +123,16 @@ export default function AppMain() {
     const load = async () => {
       const userParam = authUser.role === "admin" ? filters.user : authUser.displayName;
       try {
-        const [dailyActivity, goals] = await Promise.all([
+        const [dailyActivity, goalsData] = await Promise.all([
           fitnessApi.getDailyActivity({ user: userParam, from: filters.startDate, to: filters.endDate }),
           fitnessApi.getGoals(userParam),
         ]);
         if (cancelled) return;
         setActivity(Array.isArray(dailyActivity) ? dailyActivity.sort((a, b) => a.date.localeCompare(b.date)) : []);
         if (userParam !== "all") {
-          const sortedGoals = [...goals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-          setGoals(sortedGoals);
-          setSelectedGoalId((prev) =>
-            prev && sortedGoals.some((goal) => goal.goalId === prev) ? prev : (sortedGoals[0]?.goalId ?? null)
-          );
+          const sorted = [...goalsData].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+          setGoals(sorted);
+          setSelectedGoalId((prev) => prev && sorted.some((g) => g.goalId === prev) ? prev : (sorted[0]?.goalId ?? null));
           setUserWiseGoals([]);
           setStreaks(await fitnessApi.getStreaks(userParam));
         } else {
@@ -151,111 +140,76 @@ export default function AppMain() {
           setSelectedGoalId(null);
           setStreaks(null);
           const users = workoutFilterOptions.users;
-          const streakResults = await Promise.all(users.map((username) => fitnessApi.getStreaks(username).catch(() => null)));
-          const grouped = goals.reduce<Record<string, GoalsRecord[]>>((acc, goal) => {
-            const key = goal.username || goal.userId;
+          const streakResults = await Promise.all(users.map((u) => fitnessApi.getStreaks(u).catch(() => null)));
+          const grouped = goalsData.reduce<Record<string, GoalsRecord[]>>((acc, g) => {
+            const key = g.username || g.userId;
             if (!acc[key]) acc[key] = [];
-            acc[key].push(goal);
+            acc[key].push(g);
             return acc;
           }, {});
           if (!cancelled) {
-            setUserWiseGoals(
-              users.map((username, index) => ({
-                username,
-                goals: (grouped[username] || []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-                streaks: streakResults[index],
-              }))
-            );
+            setUserWiseGoals(users.map((username, i) => ({
+              username,
+              goals: (grouped[username] || []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+              streaks: streakResults[i],
+            })));
           }
         }
       } catch (error) {
-        console.error("Failed to fetch related dashboard data:", error);
+        console.error("Failed to fetch dashboard data:", error);
       }
     };
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [authUser, filters.user, filters.startDate, filters.endDate, workoutFilterOptions.users]);
 
   const handleLogin = async (payload: { email: string; password: string }) => {
     setAuthSubmitting(true);
     try {
-      const response = await fitnessApi.login(payload);
-      localStorage.setItem(AUTH_TOKEN_KEY, response.token);
-      setAuthToken(response.token);
-      setAuthUser(response.user);
-    } finally {
-      setAuthSubmitting(false);
-    }
+      const res = await fitnessApi.login(payload);
+      localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+      setAuthToken(res.token);
+      setAuthUser(res.user);
+    } finally { setAuthSubmitting(false); }
   };
 
   const handleSignup = async (payload: { email: string; password: string; displayName: string }) => {
     setAuthSubmitting(true);
     try {
-      const response = await fitnessApi.signup(payload);
-      localStorage.setItem(AUTH_TOKEN_KEY, response.token);
-      setAuthToken(response.token);
-      setAuthUser(response.user);
-    } finally {
-      setAuthSubmitting(false);
-    }
+      const res = await fitnessApi.signup(payload);
+      localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+      setAuthToken(res.token);
+      setAuthUser(res.user);
+    } finally { setAuthSubmitting(false); }
   };
 
   const handleLogout = async () => {
-    try {
-      await fitnessApi.logout();
-    } catch {
-      // ignore logout errors, clear client state anyway
-    } finally {
+    try { await fitnessApi.logout(); } catch { /* ignore */ } finally {
       setAuthToken("");
       localStorage.removeItem(AUTH_TOKEN_KEY);
       setAuthUser(null);
-      setWorkouts([]);
-      setActivity([]);
-      setGoals([]);
-      setSelectedGoalId(null);
-      setStreaks(null);
-      setUserWiseGoals([]);
+      setWorkouts([]); setActivity([]); setGoals([]);
+      setSelectedGoalId(null); setStreaks(null); setUserWiseGoals([]);
     }
   };
 
-  const clearFilters = () => {
-    setFilters((prev) => ({
-      user: canSelectUser ? "all" : authUser?.displayName || prev.user,
-      muscleGroup: "all",
-      startDate: "",
-      endDate: "",
-      search: "",
-    }));
-  };
+  const clearFilters = () => setFilters((prev) => ({
+    user: canSelectUser ? "all" : authUser?.displayName || prev.user,
+    muscleGroup: "all", startDate: "", endDate: "", search: "",
+  }));
 
   const exportReportToPdf = async () => {
     setExportingPdf(true);
     try {
-      await exportDashboardPdf({
-        filters,
-        workouts: filteredWorkouts,
-        chartData,
-        activity,
-        goal: selectedGoal,
-        streaks,
-      });
-    } finally {
-      setExportingPdf(false);
-    }
+      await exportDashboardPdf({ filters, workouts: filteredWorkouts, chartData, activity, goal: selectedGoal, streaks });
+    } finally { setExportingPdf(false); }
   };
 
   const refreshGoalsAndStreaks = async (targetUser: string) => {
-    const [nextGoals, nextStreaks] = await Promise.all([
-      fitnessApi.getGoals(targetUser),
-      fitnessApi.getStreaks(targetUser),
-    ]);
-    const sortedGoals = [...nextGoals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    setGoals(sortedGoals);
-    setSelectedGoalId((prev) =>
-      prev && sortedGoals.some((goal) => goal.goalId === prev) ? prev : (sortedGoals[0]?.goalId ?? null)
-    );
+    const [nextGoals, nextStreaks] = await Promise.all([fitnessApi.getGoals(targetUser), fitnessApi.getStreaks(targetUser)]);
+    const sorted = [...nextGoals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    setGoals(sorted);
+    setSelectedGoalId((prev) => prev && sorted.some((g) => g.goalId === prev) ? prev : (sorted[0]?.goalId ?? null));
     setStreaks(nextStreaks);
   };
 
@@ -264,20 +218,9 @@ export default function AppMain() {
     if (!targetUser || targetUser === "all") return;
     setSavingGoals(true);
     try {
-      await fitnessApi.createGoal({
-        user: targetUser,
-        goalName: goal.goalName,
-        period: goal.period,
-        stepsGoal: goal.stepsGoal,
-        distanceGoalKm: goal.distanceGoalKm,
-        caloriesGoal: goal.caloriesGoal,
-        activeMinutesGoal: goal.activeMinutesGoal,
-        isActive: goal.isActive,
-      });
+      await fitnessApi.createGoal({ user: targetUser, ...goal });
       await refreshGoalsAndStreaks(targetUser);
-    } finally {
-      setSavingGoals(false);
-    }
+    } finally { setSavingGoals(false); }
   };
 
   const updateGoal = async (goalId: string, goal: GoalEditorValues) => {
@@ -288,9 +231,7 @@ export default function AppMain() {
       await fitnessApi.updateGoal(goalId, goal);
       await refreshGoalsAndStreaks(targetUser);
       setSelectedGoalId(goalId);
-    } finally {
-      setSavingGoals(false);
-    }
+    } finally { setSavingGoals(false); }
   };
 
   const deleteGoal = async (goalId: string) => {
@@ -300,14 +241,12 @@ export default function AppMain() {
     try {
       await fitnessApi.deleteGoal(goalId);
       await refreshGoalsAndStreaks(targetUser);
-    } finally {
-      setSavingGoals(false);
-    }
+    } finally { setSavingGoals(false); }
   };
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+      <div className="h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
       </div>
     );
@@ -319,25 +258,17 @@ export default function AppMain() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f9fafb] dark:bg-slate-950 flex items-center justify-center p-6">
-        <div className="w-full max-w-6xl animate-pulse space-y-8">
-          <div className="h-20 bg-white dark:bg-white/5 rounded-3xl" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
-            <div className="h-48 bg-white dark:bg-white/5 rounded-3xl" />
-          </div>
-          <div className="h-96 bg-white dark:bg-white/5 rounded-3xl" />
-        </div>
+      <div className="h-screen bg-[#f8f9fa] dark:bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] dark:bg-slate-950 flex font-sans overflow-x-hidden transition-colors">
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="metro-scatter" />
-      </div>
+    /* ── ROOT: locked to viewport, no scroll ── */
+    <div className="h-screen overflow-hidden bg-[#f5f6fa] dark:bg-slate-950 flex font-sans transition-colors">
 
+      {/* ── SIDEBAR ── */}
       <Sidebar
         user={authUser}
         onRefresh={fetchWorkouts}
@@ -349,7 +280,10 @@ export default function AppMain() {
         onNavigate={setActiveTab}
       />
 
-      <main className="flex-1 relative z-10 p-4 md:p-8 lg:p-12 overflow-y-auto">
+      {/* ── MAIN CONTENT: fills remaining width, full height, no scroll ── */}
+      <main className="flex-1 h-full flex flex-col overflow-hidden px-5 pt-3 pb-12">
+
+        {/* Top bar — compact */}
         <TopBar
           title={
             activeTab === "dashboard" ? "Dashboard" :
@@ -362,157 +296,140 @@ export default function AppMain() {
           refreshing={refreshing}
         />
 
+        {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
         {activeTab === "dashboard" && (
-          <>
-            <DashboardHero
-              userName={authUser.displayName}
-              onAddClick={openAdminConsole}
-            />
+          <div
+            className="flex-1 overflow-hidden grid gap-3"
+            style={{ gridTemplateColumns: "1fr 260px", gridTemplateRows: "auto minmax(0,1fr) minmax(0,1fr)" }}
+          >
+            {/* Row 1 Left — greeting + 3 stat cards */}
+            <div className="flex flex-col gap-2 overflow-hidden">
+              <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
+              <div className="grid grid-cols-3 gap-2">
+                <StatCard label="Total Exercises" value={filteredWorkouts.length}
+                  icon={<Activity className="w-5 h-5" />} trend="+12%" subtitle="From last week" />
+                <StatCard label="Active Time" value={`${Math.round(filteredWorkouts.length * 0.75)}h`}
+                  icon={<Flame className="w-5 h-5" />} trend="+5%" subtitle="Total activity" />
+                <StatCard label="Workout Days" value={new Set(filteredWorkouts.map((w) => w.date)).size}
+                  icon={<Zap className="w-5 h-5" />} trend="+2" subtitle="Consistency" />
+              </div>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatCard
-                label="Total Exercises"
-                value={filteredWorkouts.length}
-                icon={<Activity className="w-5 h-5" />}
-                trend="+12%"
-                subtitle="From last week"
-              />
-              <StatCard
-                label="Active Time"
-                value={`${Math.round(filteredWorkouts.length * 0.75)}h`}
-                icon={<Flame className="w-5 h-5" />}
-                trend="+5%"
-                subtitle="Total activity"
-              />
-              <StatCard
-                label="Workout Days"
-                value={new Set(filteredWorkouts.map((w) => w.date)).size}
-                icon={<Zap className="w-5 h-5" />}
-                trend="+2"
-                subtitle="Consistency"
+            {/* Row 1+2 Right — Goal card spans 2 rows */}
+            <div className="row-span-2 overflow-hidden">
+              <GoalProgressCard
+                current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
+                total={selectedGoal?.stepsGoal || 10000}
+                label=" Steps"
+                onSetGoalClick={scrollToGoals}
               />
             </div>
 
-            <FilterPanel
-              filters={filters}
-              users={workoutFilterOptions.users}
-              muscleGroups={workoutFilterOptions.muscleGroups}
-              canSelectUser={canSelectUser}
-              exportingPdf={exportingPdf}
-              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-              onClear={clearFilters}
-              onExportPdf={exportReportToPdf}
-            />
+            {/* Row 2 Left — Workout chart */}
+            <div className="overflow-hidden">
+              <WorkoutChart data={chartData} />
+            </div>
 
-            <WorkoutChart data={chartData} />
-
-            <WorkoutTable
-              workouts={filteredWorkouts}
-              searchQuery={filters.search}
-              onSearchChange={(search) => setFilters(p => ({ ...p, search }))}
-              filterValue={filters.muscleGroup}
-              onFilterChange={(muscleGroup) => setFilters(p => ({ ...p, muscleGroup }))}
-            />
-
-            <ActivitySection activity={activity} />
-          </div>
-
-          <div className="lg:col-span-4 space-y-8">
-            <GoalProgressCard
-              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)}
-              total={selectedGoal?.stepsGoal || 10000}
-              label=" Steps"
-              onSetGoalClick={scrollToGoals}
-            />
-
-            <div ref={goalsSectionRef} className="scroll-mt-8">
-              <GoalsSection
-                selectedUser={canSelectUser ? filters.user : authUser.displayName}
-                goals={goals}
-                selectedGoalId={selectedGoalId}
-                streaks={streaks}
-                userWiseGoals={userWiseGoals}
-                saving={savingGoals}
-                onSelectGoal={setSelectedGoalId}
-                onCreate={createGoal}
-                onUpdate={updateGoal}
-                onDelete={deleteGoal}
+            {/* Row 3 Left — Exercise table */}
+            <div className="overflow-hidden">
+              <WorkoutTable
+                workouts={filteredWorkouts}
+                searchQuery={filters.search}
+                onSearchChange={(search) => setFilters((p) => ({ ...p, search }))}
+                filterValue={filters.muscleGroup}
+                onFilterChange={(muscleGroup) => setFilters((p) => ({ ...p, muscleGroup }))}
               />
             </div>
+
+            {/* Row 3 Right — Activity trend */}
+            <div className="overflow-hidden">
+              <ActivityTrendChart data={activity} />
+            </div>
           </div>
-        </div>
-        </>
         )}
 
+        {/* ═══════════════ ACTIVITY TAB ═══════════════ */}
         {activeTab === "activity" && (
-          <div className="mt-8 space-y-8">
+          <div className="flex-1 overflow-hidden flex flex-col gap-3">
             <FilterPanel
-              filters={filters}
-              users={workoutFilterOptions.users}
-              muscleGroups={workoutFilterOptions.muscleGroups}
-              canSelectUser={canSelectUser}
+              filters={filters} users={workoutFilterOptions.users}
+              muscleGroups={workoutFilterOptions.muscleGroups} canSelectUser={canSelectUser}
               exportingPdf={exportingPdf}
               onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-              onClear={clearFilters}
-              onExportPdf={exportReportToPdf}
+              onClear={clearFilters} onExportPdf={exportReportToPdf}
             />
-            <ActivitySection activity={activity} />
+            <div className="flex-1 overflow-hidden">
+              <ActivitySection activity={activity} />
+            </div>
           </div>
         )}
 
+        {/* ═══════════════ MAPS TAB ═══════════════ */}
         {activeTab === "maps" && (
-          <div className="mt-8">
+          <div className="flex-1 overflow-hidden">
             <MapsView />
           </div>
         )}
 
+        {/* ═══════════════ SCHEDULE TAB ═══════════════ */}
         {activeTab === "schedule" && (
-          <div className="mt-8">
+          <div className="flex-1 overflow-hidden">
             <ScheduleView />
           </div>
         )}
 
+        {/* ═══════════════ GOALS TAB ═══════════════ */}
         {activeTab === "goals" && (
-          <div className="mt-8 space-y-8">
+          <div
+            className="flex-1 overflow-hidden grid gap-3"
+            style={{ gridTemplateColumns: "1fr 280px", gridTemplateRows: "1fr" }}
+          >
+            <div ref={goalsSectionRef} className="overflow-auto">
+              <GoalsSection
+                selectedUser={canSelectUser ? filters.user : authUser.displayName}
+                goals={goals} selectedGoalId={selectedGoalId} streaks={streaks}
+                userWiseGoals={userWiseGoals} saving={savingGoals}
+                onSelectGoal={setSelectedGoalId} onCreate={createGoal}
+                onUpdate={updateGoal} onDelete={deleteGoal}
+              />
+            </div>
             <GoalProgressCard
-              current={activity.reduce((sum, day) => sum + (day.steps || 0), 0)}
+              current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
               total={selectedGoal?.stepsGoal || 10000}
               label=" Steps"
-              onSetGoalClick={scrollToGoals}
-            />
-            <GoalsSection
-              selectedUser={canSelectUser ? filters.user : authUser.displayName}
-              goals={goals}
-              selectedGoalId={selectedGoalId}
-              streaks={streaks}
-              userWiseGoals={userWiseGoals}
-              saving={savingGoals}
-              onSelectGoal={setSelectedGoalId}
-              onCreate={createGoal}
-              onUpdate={updateGoal}
-              onDelete={deleteGoal}
+              onSetGoalClick={() => goalsSectionRef.current?.scrollIntoView()}
             />
           </div>
         )}
 
-        <footer className="mt-20 pt-12 border-t border-slate-100 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 pb-12">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
-              <Bolt className="w-4 h-4 text-white fill-white/20" />
-            </div>
-            <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Fit Tracker Dashboard</span>
-          </div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+        {/* ── Compact Footer Strip — always visible, no extra height ── */}
+        <div className="shrink-0 mt-3 pt-3 pb-3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 tracking-tight">Fit Tracker Dashboard</span>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hidden lg:block">
             Powered by Fitness Intelligence Team
           </p>
-          <div className="flex gap-8">
-            <button onClick={() => setActiveFooterModal("documentation")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Docs</button>
-            <button onClick={() => setActiveFooterModal("privacy")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Privacy</button>
-            <button onClick={() => setActiveFooterModal("support")} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors">Support</button>
+          <div className="flex gap-5">
+            <button
+              onClick={() => setActiveFooterModal("documentation")}
+              className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors"
+            >
+              Docs
+            </button>
+            <button
+              onClick={() => setActiveFooterModal("privacy")}
+              className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors"
+            >
+              Privacy
+            </button>
+            <button
+              onClick={() => setActiveFooterModal("support")}
+              className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors"
+            >
+              Support
+            </button>
           </div>
-        </footer>
+        </div>
+
       </main>
 
       <FooterInfoModal active={activeFooterModal} onClose={() => setActiveFooterModal(null)} />
