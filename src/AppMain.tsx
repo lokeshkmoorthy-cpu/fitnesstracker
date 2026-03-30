@@ -281,7 +281,7 @@ export default function AppMain() {
       />
 
       {/* ── MAIN CONTENT: fills remaining width, full height, no scroll ── */}
-      <main className="flex-1 h-full flex flex-col overflow-hidden px-5 pt-3 pb-12">
+      <main className="flex-1 h-full flex flex-col overflow-y-auto px-5 pt-3 pb-12 scrollbar-custom">
 
         {/* Top bar — compact */}
         <TopBar
@@ -299,11 +299,11 @@ export default function AppMain() {
         {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
         {activeTab === "dashboard" && (
           <div
-            className="flex-1 overflow-hidden grid gap-3"
-            style={{ gridTemplateColumns: "1fr 260px", gridTemplateRows: "auto minmax(0,1fr) minmax(0,1fr)" }}
+            className="flex-1 grid gap-3"
+            style={{ gridTemplateColumns: "1fr 260px", gridTemplateRows: "auto auto auto" }}
           >
             {/* Row 1 Left — greeting + 3 stat cards */}
-            <div className="flex flex-col gap-2 overflow-hidden">
+            <div className="flex flex-col gap-2">
               <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
               <div className="grid grid-cols-3 gap-2">
                 <StatCard label="Total Exercises" value={filteredWorkouts.length}
@@ -316,7 +316,7 @@ export default function AppMain() {
             </div>
 
             {/* Row 1+2 Right — Goal card spans 2 rows */}
-            <div className="row-span-2 overflow-hidden">
+            <div className="row-span-2">
               <GoalProgressCard
                 current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
                 total={selectedGoal?.stepsGoal || 10000}
@@ -326,12 +326,12 @@ export default function AppMain() {
             </div>
 
             {/* Row 2 Left — Workout chart */}
-            <div className="overflow-hidden">
+            <div>
               <WorkoutChart data={chartData} />
             </div>
 
             {/* Row 3 Left — Exercise table */}
-            <div className="overflow-hidden">
+            <div>
               <WorkoutTable
                 workouts={filteredWorkouts}
                 searchQuery={filters.search}
@@ -342,7 +342,7 @@ export default function AppMain() {
             </div>
 
             {/* Row 3 Right — Activity trend */}
-            <div className="overflow-hidden">
+            <div>
               <ActivityTrendChart data={activity} />
             </div>
           </div>
@@ -350,7 +350,7 @@ export default function AppMain() {
 
         {/* ═══════════════ ACTIVITY TAB ═══════════════ */}
         {activeTab === "activity" && (
-          <div className="flex-1 overflow-hidden flex flex-col gap-3">
+          <div className="flex-1 flex flex-col gap-3">
             <FilterPanel
               filters={filters} users={workoutFilterOptions.users}
               muscleGroups={workoutFilterOptions.muscleGroups} canSelectUser={canSelectUser}
@@ -358,7 +358,7 @@ export default function AppMain() {
               onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
               onClear={clearFilters} onExportPdf={exportReportToPdf}
             />
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1">
               <ActivitySection activity={activity} />
             </div>
           </div>
@@ -366,14 +366,14 @@ export default function AppMain() {
 
         {/* ═══════════════ MAPS TAB ═══════════════ */}
         {activeTab === "maps" && (
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1">
             <MapsView />
           </div>
         )}
 
         {/* ═══════════════ SCHEDULE TAB ═══════════════ */}
         {activeTab === "schedule" && (
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1">
             <ScheduleView />
           </div>
         )}
@@ -381,8 +381,8 @@ export default function AppMain() {
         {/* ═══════════════ GOALS TAB ═══════════════ */}
         {activeTab === "goals" && (
           <div
-            className="flex-1 overflow-hidden grid gap-3"
-            style={{ gridTemplateColumns: "1fr 280px", gridTemplateRows: "1fr" }}
+            className="flex-1 grid gap-3"
+            style={{ gridTemplateColumns: "1fr 280px", gridTemplateRows: "auto" }}
           >
             <div ref={goalsSectionRef} className="overflow-auto">
               <GoalsSection

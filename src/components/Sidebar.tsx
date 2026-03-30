@@ -99,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex flex-col h-full p-8">
+        <div className="flex flex-col h-full p-8 overflow-y-auto scrollbar-custom">
           {/* Logo Section */}
           <div className="flex items-center gap-3 mb-10">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-purple-200">
