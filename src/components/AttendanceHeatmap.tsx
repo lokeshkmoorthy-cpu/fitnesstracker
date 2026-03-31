@@ -1,51 +1,41 @@
-import { useMemo, type CSSProperties } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { useMemo, useState, type CSSProperties } from "react";
+import { Loader2, RefreshCw, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { clsx } from "clsx";
 import type { AttendanceRecord } from "@/src/types/fitness";
 
-const MS_PER_DAY = 86400000;
-/** Inclusive day span for the heatmap window (rolling year when no date filter). */
-const ONE_YEAR_DAYS = 365;
-
-/** Fixed pixel size (GitHub-style dense grid, not scaled-up squares). */
-const HEATMAP_CELL_PX = 10;
+/** Standard calendar grid (7 columns). */
+const HEATMAP_CELL_PX = 28;
 
 function todayIso(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
-function addDays(iso: string, days: number): string {
-    const d = new Date(`${iso}T12:00:00.000Z`);
-    d.setUTCDate(d.getUTCDate() + days);
-    return d.toISOString().slice(0, 10);
+function getDaysInMonth(month: number, year: number): Date[] {
+    const date = new Date(year, month, 1);
+    const days: Date[] = [];
+    while (date.getMonth() === month) {
+        days.push(new Date(date));
+        date.setDate(date.getDate() + 1);
+    }
+    return days;
 }
 
-function daysBetween(a: string, b: string): number {
-    const d1 = new Date(`${a}T12:00:00.000Z`).getTime();
-    const d2 = new Date(`${b}T12:00:00.000Z`).getTime();
-    return Math.round((d2 - d1) / MS_PER_DAY);
-}
-
-/** Sunday (UTC) of the week containing `iso`. */
-function startOfWeekSunday(iso: string): string {
-    const d = new Date(`${iso}T12:00:00.000Z`);
-    const dow = d.getUTCDay();
-    d.setUTCDate(d.getUTCDate() - dow);
-    return d.toISOString().slice(0, 10);
-}
-
-function maxIso(a: string, b: string): string {
-    return a > b ? a : b;
+function getIsoDate(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
 }
 
 /** GitHub-like contribution colors (light / dark). */
 function intensityClass(count: number): string {
     if (count <= 0) {
-        return "bg-[#ebedf0] dark:bg-slate-700/90";
+        return "bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500";
     }
-    if (count === 1) return "bg-[#9be9a8] dark:bg-emerald-800/85";
-    if (count === 2) return "bg-[#40c463] dark:bg-emerald-600";
-    return "bg-[#216e39] dark:bg-emerald-500";
+    if (count === 1) return "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50";
+    if (count === 2) return "bg-emerald-300 dark:bg-emerald-700 text-emerald-900 dark:text-emerald-100";
+    if (count === 3) return "bg-emerald-500 dark:bg-emerald-600 text-white";
+    return "bg-emerald-700 dark:bg-emerald-500 text-white";
 }
 
 export interface AttendanceUserFilter {
@@ -56,90 +46,102 @@ export interface AttendanceUserFilter {
 
 export interface AttendanceHeatmapProps {
     records: AttendanceRecord[];
-    /** Dashboard filter start (YYYY-MM-DD); empty = no lower bound from UI */
-    rangeStart?: string;
-    /** Dashboard filter end (YYYY-MM-DD); empty = today */
-    rangeEnd?: string;
     className?: string;
-    /** Card title */
     title?: string;
-    /** Admin-only user scope */
     userFilter?: AttendanceUserFilter;
-    /** When `userFilter` is omitted (non-admin), show this label beside refresh */
     viewerLabel?: string;
     onRefresh?: () => void | Promise<void>;
     refreshing?: boolean;
+    rangeStart?: string;
+    rangeEnd?: string;
 }
 
-/**
- * GitHub-style contribution grid: 7 rows (Sun–Sat) × N week columns.
- * The visible window is at most one year ending at `rangeEnd` (or today / latest record).
- */
 export function AttendanceHeatmap({
     records,
-    rangeStart = "",
-    rangeEnd = "",
     className,
-    title = "Gym attendance",
+    title = "Attendance Calendar",
     userFilter,
     viewerLabel,
     onRefresh,
     refreshing = false,
+    rangeStart,
+    rangeEnd,
 }: AttendanceHeatmapProps) {
-    const { cells, numWeeks } = useMemo(() => {
-        let maxRecordDate = "";
-        for (const r of records) {
-            if (r.date && r.date > maxRecordDate) maxRecordDate = r.date;
-        }
-        const explicitEnd = rangeEnd.trim() !== "";
-        // No dashboard end date: extend past "today" so future sheet dates still render in the grid.
-        const end = explicitEnd
-            ? rangeEnd
-            : maxIso(todayIso(), maxRecordDate || todayIso());
-        const capStart = addDays(end, -ONE_YEAR_DAYS + 1);
-        const renderStart = maxIso(rangeStart || "1970-01-01", capStart);
-        const renderEnd = end;
+    const [viewDate, setViewDate] = useState(new Date());
 
+    const month = viewDate.getMonth();
+    const year = viewDate.getFullYear();
+
+    const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const { cells, monthYearLabel } = useMemo(() => {
         const counts = new Map<string, number>();
         for (const r of records) {
             if (!r.date) continue;
             counts.set(r.date, (counts.get(r.date) ?? 0) + 1);
         }
 
-        const gridStart = startOfWeekSunday(renderStart);
-        const endWeekSunday = startOfWeekSunday(renderEnd);
-        const weekSpan = Math.floor(daysBetween(gridStart, endWeekSunday) / 7) + 1;
-        const numWeeks = Math.max(1, weekSpan);
+        const days = getDaysInMonth(month, year);
+        const firstDayOfWeek = days[0].getDay(); // 0 = Sunday
 
         const cells: Array<{
-            col: number;
-            row: number;
             date: string;
+            dayNumber: number;
             count: number;
-            inRange: boolean;
+            isCurrentMonth: boolean;
         }> = [];
 
-        for (let col = 0; col < numWeeks; col += 1) {
-            for (let row = 0; row < 7; row += 1) {
-                const date = addDays(gridStart, col * 7 + row);
-                const inRange = date >= renderStart && date <= renderEnd;
-                const count = inRange ? (counts.get(date) ?? 0) : 0;
-                cells.push({ col, row, date, count: inRange ? count : 0, inRange });
-            }
+        // Padding for previous month
+        const prevMonthLastDay = new Date(year, month, 0).getDate();
+        for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+            cells.push({
+                date: "",
+                dayNumber: prevMonthLastDay - i,
+                count: 0,
+                isCurrentMonth: false,
+            });
         }
 
-        return { cells, numWeeks };
-    }, [records, rangeStart, rangeEnd]);
+        // Current month days
+        for (const d of days) {
+            const iso = getIsoDate(d);
+            cells.push({
+                date: iso,
+                dayNumber: d.getDate(),
+                count: counts.get(iso) ?? 0,
+                isCurrentMonth: true,
+            });
+        }
 
-    const hasAny = useMemo(
-        () => records.some((r) => Boolean(r.date)),
-        [records]
-    );
+        // Padding for next month
+        const totalCells = Math.ceil(cells.length / 7) * 7;
+        const nextMonthPadding = totalCells - cells.length;
+        for (let i = 1; i <= nextMonthPadding; i++) {
+            cells.push({
+                date: "",
+                dayNumber: i,
+                count: 0,
+                isCurrentMonth: false,
+            });
+        }
 
-    /** Fixed track sizes so cells stay small and dense like GitHub (no huge scaled squares). */
-    const gridStyle: CSSProperties = {
-        gridTemplateColumns: `repeat(${numWeeks}, ${HEATMAP_CELL_PX}px)`,
-        gridTemplateRows: `repeat(7, ${HEATMAP_CELL_PX}px)`,
+        return { cells, monthYearLabel: `${monthNames[month]} ${year}` };
+    }, [records, month, year]);
+
+    const changeMonth = (delta: number) => {
+        const next = new Date(year, month + delta, 1);
+        setViewDate(next);
+    };
+
+    const handleJumpToDate = (iso: string) => {
+        if (!iso) return;
+        const d = new Date(iso);
+        if (!isNaN(d.getTime())) {
+            setViewDate(d);
+        }
     };
 
     const userOptions = useMemo(() => {
@@ -152,120 +154,175 @@ export function AttendanceHeatmap({
     }, [userFilter]);
 
     return (
-        <div className={clsx("w-full", className)}>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <h3 className="text-sm font-medium text-neutral-700 dark:text-slate-200 shrink-0">
-                    {title}
-                </h3>
+        <div className={clsx("w-full bg-white dark:bg-slate-900/50 rounded-2xl p-2.5 shadow-sm border border-slate-200 dark:border-white/5", className)}>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center">
+                        <CalendarIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                            {title}
+                        </h3>
+                        <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            Personal Tracking
+                        </p>
+                    </div>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {/* User Filter */}
                     {userFilter && (
-                        <>
-                            <label className="sr-only" htmlFor="attendance-user-filter">
-                                User
-                            </label>
-                            <select
-                                id="attendance-user-filter"
-                                value={userFilter.value}
-                                onChange={(e) => userFilter.onChange(e.target.value)}
-                                className="text-xs font-semibold text-slate-700 dark:text-white pl-3 pr-8 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/10 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer max-w-[200px]"
-                            >
-                                {userOptions.map((u) => (
-                                    <option key={u} value={u}>
-                                        {u === "all" ? "All users" : u}
-                                    </option>
-                                ))}
-                            </select>
-                        </>
-                    )}
-                    {!userFilter && viewerLabel && (
-                        <span
-                            className="text-xs font-semibold text-slate-600 dark:text-slate-400 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/10 rounded-2xl max-w-[200px] truncate"
-                            title={viewerLabel}
+                        <select
+                            value={userFilter.value}
+                            onChange={(e) => userFilter.onChange(e.target.value)}
+                            className="h-8 px-2 text-[10px] font-bold bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-lg text-slate-700 dark:text-slate-200 outline-none focus:ring-2 ring-purple-500/20 cursor-pointer transition-all"
                         >
-                            {viewerLabel}
-                        </span>
+                            {userOptions.map((u) => (
+                                <option key={u} value={u}>
+                                    {u === "all" ? "All Users" : u}
+                                </option>
+                            ))}
+                        </select>
                     )}
+
+                    {!userFilter && viewerLabel && (
+                        <div className="h-8 px-2 flex items-center text-[9px] font-black uppercase tracking-widest bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-lg text-slate-400 truncate max-w-[120px]">
+                            {viewerLabel}
+                        </div>
+                    )}
+
+                    {/* Month Filter */}
+                    <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-lg p-0.5">
+                        <button
+                            onClick={() => changeMonth(-1)}
+                            className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md text-slate-500 dark:text-slate-400 transition-colors"
+                        >
+                            <ChevronLeft size={14} />
+                        </button>
+                        <select
+                            value={month}
+                            onChange={(e) => setViewDate(new Date(year, parseInt(e.target.value), 1))}
+                            className="bg-transparent text-[10px] font-bold px-1 py-0.5 outline-none text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+                        >
+                            {monthNames.map((m, i) => (
+                                <option key={m} value={i}>{m}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={year}
+                            onChange={(e) => setViewDate(new Date(parseInt(e.target.value), month, 1))}
+                            className="bg-transparent text-[10px] font-bold px-1 py-0.5 outline-none text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+                        >
+                            {[year - 1, year, year + 1].map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={() => changeMonth(1)}
+                            className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md text-slate-500 dark:text-slate-400 transition-colors"
+                        >
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
+
+                    {/* Date Picker Filter */}
+                    <div className="relative group flex items-center justify-center w-8 h-8">
+                        <input
+                            type="date"
+                            value={getIsoDate(viewDate)}
+                            onChange={(e) => handleJumpToDate(e.target.value)}
+                            className="absolute inset-0 h-full w-full p-0 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-lg text-transparent cursor-pointer outline-none focus:ring-2 ring-purple-500/20 transition-all opacity-0 z-20"
+                        />
+                        <div className="flex items-center justify-center w-full h-full text-slate-500 dark:text-slate-400 group-hover:text-purple-600 transition-colors pointer-events-none z-10">
+                            <CalendarIcon size={14} />
+                        </div>
+                    </div>
+
                     {onRefresh && (
                         <button
                             type="button"
                             onClick={() => void onRefresh()}
                             disabled={refreshing}
-                            className="inline-flex items-center justify-center p-1.5 rounded-2xl border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 transition-colors"
-                            title="Refresh attendance"
-                            aria-label="Refresh attendance"
+                            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-50 transition-all hover:shadow-sm"
+                            title="Refresh"
                         >
                             {refreshing ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
                             ) : (
-                                <RefreshCw className="w-4 h-4" />
+                                <RefreshCw className="w-3.5 h-3.5" />
                             )}
                         </button>
                     )}
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-neutral-500 dark:text-slate-400 mb-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span>Less</span>
-                    <span
-                        className="inline-block size-2.5 rounded-[2px] bg-[#ebedf0] dark:bg-slate-700/90"
-                        aria-hidden
-                    />
-                    <span
-                        className="inline-block size-2.5 rounded-[2px] bg-[#9be9a8] dark:bg-emerald-800/85"
-                        aria-hidden
-                    />
-                    <span
-                        className="inline-block size-2.5 rounded-[2px] bg-[#40c463] dark:bg-emerald-600"
-                        aria-hidden
-                    />
-                    <span
-                        className="inline-block size-2.5 rounded-[2px] bg-[#216e39] dark:bg-emerald-500"
-                        aria-hidden
-                    />
-                    <span>More</span>
+            <div className="w-full">
+                {/* Day of week headers */}
+                <div className="grid grid-cols-7 gap-1.5 mb-2">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+                        <div key={d} className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center py-1">
+                            {d}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5">
+                    {cells.map((cell, idx) => (
+                        <div
+                            key={idx}
+                            title={
+                                cell.date
+                                    ? `${cell.date}: ${cell.count} check-in${cell.count === 1 ? "" : "s"}`
+                                    : undefined
+                            }
+                            className={clsx(
+                                "w-full h-[28px] flex items-center justify-center rounded-lg text-[9px] font-bold transition-all relative overflow-hidden",
+                                cell.isCurrentMonth
+                                    ? intensityClass(cell.count)
+                                    : "bg-slate-50/50 dark:bg-slate-800/20 text-slate-300 dark:text-slate-600 border border-dashed border-slate-100 dark:border-white/5",
+                                cell.date === todayIso() &&
+                                "ring-2 ring-purple-500 ring-offset-1 dark:ring-offset-slate-900"
+                            )}
+                        >
+                            <span className="relative z-10">{cell.dayNumber}</span>
+
+                            {cell.count > 0 && cell.isCurrentMonth && (
+                                <div className="absolute bottom-1 flex gap-[2px] justify-center">
+                                    {Array.from({ length: Math.min(cell.count, 3) }).map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="w-[3px] h-[3px] rounded-full bg-current opacity-60"
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             </div>
 
-            {!hasAny ? (
-                <p className="text-sm text-neutral-500 dark:text-slate-400 py-2">
-                    No attendance in this range yet.
-                </p>
-            ) : (
-                <div className="w-full min-w-0 overflow-x-auto pb-1">
-                    <div
-                        className="grid w-max max-w-full gap-[3px]"
-                        style={gridStyle}
-                        role="grid"
-                        aria-label="Attendance by day"
-                    >
-                        {cells.map((cell) => (
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intensity</span>
+                    <div className="flex gap-1">
+                        {[0, 1, 2, 3].map(lvl => (
                             <div
-                                key={`${cell.col}-${cell.row}`}
-                                role="gridcell"
-                                style={{
-                                    gridColumn: cell.col + 1,
-                                    gridRow: cell.row + 1,
-                                }}
-                                title={
-                                    cell.inRange
-                                        ? `${cell.date}: ${cell.count} check-in${cell.count === 1 ? "" : "s"}`
-                                        : cell.date
-                                }
+                                key={lvl}
                                 className={clsx(
-                                    "min-w-0 w-full h-full rounded-[2px]",
-                                    !cell.inRange &&
-                                    "bg-[#f6f8fa] dark:bg-slate-800/50",
-                                    cell.inRange &&
-                                    (cell.count === 0
-                                        ? "bg-[#ebedf0] dark:bg-slate-700/90"
-                                        : intensityClass(cell.count))
+                                    "w-2.5 h-2.5 rounded-[3px]",
+                                    lvl === 0 ? "bg-slate-100 dark:bg-slate-800" :
+                                        lvl === 1 ? "bg-emerald-100 dark:bg-emerald-900/50" :
+                                            lvl === 2 ? "bg-emerald-300 dark:bg-emerald-700" : "bg-emerald-600"
                                 )}
                             />
                         ))}
                     </div>
                 </div>
-            )}
-        </div>
+                <div className="text-[10px] font-bold text-slate-400">
+                    Showing {monthNames[month]} {year}
+                </div>
+            </div>
+        </div >
     );
 }

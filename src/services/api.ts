@@ -16,6 +16,9 @@ interface GoalPayload {
   distanceGoalKm: number;
   caloriesGoal: number;
   activeMinutesGoal: number;
+  description?: string;
+  targetValue?: number;
+  targetUnit?: string;
   isActive: boolean;
 }
 
@@ -26,6 +29,9 @@ interface GoalUpdatePayload {
   distanceGoalKm: number;
   caloriesGoal: number;
   activeMinutesGoal: number;
+  description?: string;
+  targetValue?: number;
+  targetUnit?: string;
   isActive: boolean;
 }
 

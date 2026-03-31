@@ -35,27 +35,21 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp, onOpenAdmin, activeItem, onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem("sidebar_collapsed") === "true";
   });
 
   useEffect(() => {
-    // Check initial state applied by index.html script
-    if (document.documentElement.classList.contains("dark")) {
-      setIsDark(true);
-    }
-
     // Auto-collapse on smaller screens
     const handleResize = () => {
       if (window.innerWidth < 1280 && window.innerWidth >= 1024) {
         setIsCollapsed(true);
       }
     };
-    
+
     // Slight delay so it doesn't override manual setting immediately if not needed
     // Actually safe to just run on mount/resize
-    handleResize(); 
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -66,30 +60,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     localStorage.setItem("sidebar_collapsed", nextState.toString());
   };
 
-  const toggleTheme = () => {
-    const isDarkMode = !isDark;
-    setIsDark(isDarkMode);
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
-
   const mainMenuItems = [
     { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
     { icon: Activity, label: "Activity", id: "activity" },
-    { icon: Map, label: "Maps", id: "maps" },
+    // { icon: Map, label: "Maps", id: "maps" },
     { icon: CalendarIcon, label: "Schedule", id: "schedule" },
-    { icon: Target, label: "Goals", id: "goals" },
+    // { icon: Target, label: "Goals", id: "goals" },
   ];
 
   const accountItems = [
     { icon: Settings, label: "Settings", id: "settings" },
-    { icon: Info, label: "Help", id: "help" },
-    // { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
   ];
 
   const menuAction = (id: string) => {
@@ -126,28 +106,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
       >
         <div className={cn(
           "flex flex-col h-full overflow-y-auto scrollbar-custom",
-          isCollapsed ? "px-4 py-8 items-center" : "p-8"
+          isCollapsed ? "px-2 py-8 items-center" : "p-8"
         )}>
           {/* Logo Section */}
-          <div className={cn("flex items-center mb-10 w-full", isCollapsed ? "flex-col gap-4" : "justify-between")}>
-            <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-purple-200 shrink-0">
-                <Bolt className="text-white w-6 h-6 fill-white/20" />
+          <div className={cn("flex flex-col items-center w-full mb-10", isCollapsed ? "gap-6" : "gap-4")}>
+            <div className={cn("flex items-center w-full", isCollapsed ? "justify-center" : "justify-between")}>
+              <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-purple-500/20 dark:shadow-purple-900/40 shrink-0">
+                  <Bolt className="text-white w-6 h-6 fill-white/20" />
+                </div>
+                {!isCollapsed && (
+                  <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate whitespace-nowrap">
+                    Fit Tracker
+                  </span>
+                )}
               </div>
+
               {!isCollapsed && (
-                <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate whitespace-nowrap">
-                  Fit Tracker
-                </span>
+                <button
+                  onClick={toggleCollapse}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors shrink-0"
+                  title="Collapse Sidebar"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
               )}
             </div>
-            
-            <button 
-              onClick={toggleCollapse}
-              className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors shrink-0"
-              title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-            >
-              {isCollapsed ? <ChevronRight className="w-5 h-5"/> : <ChevronLeft className="w-5 h-5"/>}
-            </button>
+
+            {isCollapsed && (
+              <button
+                onClick={toggleCollapse}
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors shrink-0 bg-slate-50 dark:bg-slate-900/50"
+                title="Expand Sidebar"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <nav className="flex-1 space-y-8 w-full">
@@ -156,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
               {!isCollapsed ? (
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
               ) : (
-                <div className="h-4 mb-6 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6" />
               )}
               <div className="space-y-2">
                 {mainMenuItems.map((item) => (
@@ -165,17 +159,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     title={isCollapsed ? item.label : undefined}
                     onClick={() => menuAction(item.id)}
                     className={cn(
-                      "flex items-center rounded-2xl transition-all duration-200 group relative w-full",
-                      isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5",
+                      "flex items-center rounded-2xl transition-all duration-200 group relative",
+                      isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5 w-full",
                       activeItem === item.id
-                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white shadow-sm"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
                     )}
                   >
                     <item.icon
                       className={cn(
                         "w-5 h-5 shrink-0 transition-colors",
-                         activeItem === item.id 
+                        activeItem === item.id
                           ? "text-cyan-600 dark:text-cyan-400"
                           : "text-slate-500 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300"
                       )}
@@ -195,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
               {!isCollapsed ? (
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Account</h3>
               ) : (
-                <div className="h-4 mb-6 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6" />
               )}
               <div className="space-y-2">
                 {accountItems.map((item) => (
@@ -205,9 +199,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     onClick={() => menuAction(item.id)}
                     className={cn(
                       "flex items-center rounded-2xl transition-all duration-200 group w-full",
-                      isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5",
-                      activeItem === item.id 
-                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                      isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5",
+                      activeItem === item.id
+                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white shadow-sm"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
                     )}
                   >
@@ -221,25 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                   </button>
                 ))}
 
-                <button
-                  onClick={toggleTheme}
-                  title={isCollapsed ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
-                  className={cn(
-                    "flex items-center rounded-2xl transition-all duration-200 group text-slate-500 w-full hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200",
-                    isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5"
-                  )}
-                >
-                  {isDark ? (
-                    <Sun className="w-5 h-5 shrink-0 text-slate-400 group-hover:text-amber-500 transition-colors" />
-                  ) : (
-                    <Moon className="w-5 h-5 shrink-0 text-slate-400 group-hover:text-amber-500 transition-colors" />
-                  )}
-                  {!isCollapsed && (
-                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
-                      {isDark ? "Light Mode" : "Dark Mode"}
-                    </span>
-                  )}
-                </button>
+
               </div>
             </div>
 
@@ -248,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 {!isCollapsed ? (
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4 mt-8">Admin</h3>
                 ) : (
-                  <div className="h-4 mb-6 mt-8 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+                  <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6 mt-8" />
                 )}
                 <button
                   title={isCollapsed ? "Admin Console" : undefined}
@@ -260,8 +236,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     }
                   }}
                   className={cn(
-                    "flex items-center rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800 w-full",
-                    isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5"
+                    "flex items-center rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800",
+                    isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5 w-full"
                   )}
                 >
                   <Users className="w-5 h-5 shrink-0 text-purple-600 dark:text-purple-400" />
@@ -276,10 +252,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
           {/* User Profile */}
           <div className={cn(
             "mt-auto pt-8 border-t border-slate-100 dark:border-slate-800/60 flex items-center w-full",
-            isCollapsed ? "flex-col gap-4 justify-center" : "justify-between"
+            isCollapsed ? "flex-col gap-6 justify-center" : "justify-between"
           )}>
             <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3 min-w-0")}>
-              <div className="w-11 h-11 shrink-0 rounded-full bg-slate-100 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center overflow-hidden">
+              <div className="w-12 h-12 shrink-0 rounded-full bg-slate-100 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center overflow-hidden">
                 <User className="w-6 h-6 text-slate-400 translate-y-1" />
               </div>
               {!isCollapsed && (
@@ -296,7 +272,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             <button
               title={isCollapsed ? "Log out" : undefined}
               onClick={onLogout}
-              className="p-2 shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+              className={cn(
+                "shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all",
+                isCollapsed ? "w-10 h-10 flex items-center justify-center" : "p-2"
+              )}
             >
               <LogOut className="w-5 h-5" />
             </button>

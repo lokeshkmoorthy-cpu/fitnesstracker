@@ -33,7 +33,7 @@ const TELEGRAM_MAX_VERIFY_ATTEMPTS = 5;
 const WORKOUTS_RANGE = "Workouts!A:F";
 const ACTIVITY_RANGE = "Activity!A:H";
 const GOALS_SHEET = "Goals";
-const GOALS_RANGE = `${GOALS_SHEET}!A:K`;
+const GOALS_RANGE = `${GOALS_SHEET}!A:N`;
 const USERS_SHEET = "Users";
 const SESSIONS_SHEET = "Sessions";
 const AUDIT_SHEET = "AuditLog";
@@ -106,6 +106,9 @@ interface GoalsRecord {
   distanceGoalKm: number;
   caloriesGoal: number;
   activeMinutesGoal: number;
+  description: string;
+  targetValue: number;
+  targetUnit: string;
   isActive: boolean;
   updatedAt: string;
 }
@@ -442,6 +445,9 @@ async function ensureAuthSheets() {
       "distanceGoalKm",
       "caloriesGoal",
       "activeMinutesGoal",
+      "description",
+      "targetValue",
+      "targetUnit",
       "isactive",
       "updatedat",
     ]);
@@ -699,6 +705,9 @@ async function getGoalsRecords(): Promise<GoalsRecord[]> {
     "distancegoalkm",
     "caloriesgoal",
     "activeminutesgoal",
+    "description",
+    "targetvalue",
+    "targetunit",
     "isactive",
     "updatedat",
   ];
@@ -729,6 +738,9 @@ async function getGoalsRecords(): Promise<GoalsRecord[]> {
       distanceGoalKm: safeNumber(get("distancegoalkm")),
       caloriesGoal: safeNumber(get("caloriesgoal")),
       activeMinutesGoal: safeNumber(get("activeminutesgoal")),
+      description: get("description") || row[9] || "",
+      targetValue: safeNumber(get("targetvalue") || row[10]),
+      targetUnit: get("targetunit") || row[11] || "",
       isActive: isActiveRaw !== "false",
       updatedAt,
     };
@@ -748,6 +760,9 @@ function defaultGoalForUser(userId: string, username: string): GoalsRecord {
     distanceGoalKm: 5,
     caloriesGoal: 450,
     activeMinutesGoal: 45,
+    description: "Daily fitness maintenance",
+    targetValue: 0,
+    targetUnit: "",
     isActive: true,
     updatedAt,
   };
@@ -764,6 +779,9 @@ function serializeGoalRow(goal: GoalsRecord): Array<string | number> {
     goal.distanceGoalKm,
     goal.caloriesGoal,
     goal.activeMinutesGoal,
+    goal.description || "",
+    goal.targetValue || 0,
+    goal.targetUnit || "",
     goal.isActive ? "true" : "false",
     goal.updatedAt,
   ];
@@ -1731,7 +1749,7 @@ app.get("/api/goals", requireAuth, async (req, res) => {
 app.post("/api/goals", requireAuth, async (req, res) => {
   if (!ensureSpreadsheetId(res)) return;
   if (!req.authUser) return res.status(401).json({ error: "Unauthorized" });
-  const { user, goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, isActive } =
+  const { user, goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, description, targetValue, targetUnit, isActive } =
     req.body || {};
   if (period !== "daily" && period !== "weekly") {
     return res.status(400).json({ error: "period must be daily or weekly" });
@@ -1768,6 +1786,9 @@ app.post("/api/goals", requireAuth, async (req, res) => {
       distanceGoalKm: parsedGoals[1],
       caloriesGoal: parsedGoals[2],
       activeMinutesGoal: parsedGoals[3],
+      description: String(description || ""),
+      targetValue: safeNumber(targetValue),
+      targetUnit: String(targetUnit || ""),
       isActive: isActive === false ? false : true,
       updatedAt: nowIso(),
     };
@@ -1794,7 +1815,7 @@ app.put("/api/goals/:goalId", requireAuth, async (req, res) => {
   if (!req.authUser) return res.status(401).json({ error: "Unauthorized" });
   const goalId = req.params.goalId?.trim();
   if (!goalId) return res.status(400).json({ error: "goalId is required" });
-  const { goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, isActive } = req.body || {};
+  const { goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, description, targetValue, targetUnit, isActive } = req.body || {};
   if (period !== "daily" && period !== "weekly") {
     return res.status(400).json({ error: "period must be daily or weekly" });
   }
@@ -1829,10 +1850,13 @@ app.put("/api/goals/:goalId", requireAuth, async (req, res) => {
       distanceGoalKm: parsedGoals[1],
       caloriesGoal: parsedGoals[2],
       activeMinutesGoal: parsedGoals[3],
+      description: typeof description === "string" ? description : existing.description,
+      targetValue: targetValue !== undefined ? safeNumber(targetValue) : existing.targetValue,
+      targetUnit: typeof targetUnit === "string" ? targetUnit : existing.targetUnit,
       isActive: isActive === false ? false : true,
       updatedAt: nowIso(),
     };
-    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:K${existing.rowIndex}`, serializeGoalRow(updatedGoal));
+    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:N${existing.rowIndex}`, serializeGoalRow(updatedGoal));
     await logAuditEvent(req.authUser.userId, "goal_update", updatedGoal.goalId, {
       userId: updatedGoal.userId,
       goalName: updatedGoal.goalName,
@@ -1861,7 +1885,10 @@ app.delete("/api/goals/:goalId", requireAuth, async (req, res) => {
     if (req.authUser.role !== "admin" && existing.userId !== req.authUser.userId) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:K${existing.rowIndex}`, [
+    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:N${existing.rowIndex}`, [
+      "",
+      "",
+      "",
       "",
       "",
       "",

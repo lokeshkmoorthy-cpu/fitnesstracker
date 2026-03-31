@@ -373,6 +373,7 @@ export default function AppMain() {
           }
           onRefresh={fetchWorkouts}
           refreshing={refreshing}
+          onHelp={() => setIsHelpModalOpen(true)}
         />
 
         {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
@@ -382,42 +383,50 @@ export default function AppMain() {
             <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
               <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
               <div className="grid grid-cols-12 gap-3 min-h-0">
-                <div className="col-span-3 flex flex-col gap-3">
-                  <StatCard label="Total Exercises" value={filteredWorkouts.length}
-                    icon={<Activity className="w-5 h-5" />} trend="+12%" subtitle="From last week" />
-                  <StatCard label="Workout Days" value={new Set(filteredWorkouts.map((w) => w.date)).size}
-                    icon={<Zap className="w-5 h-5" />} trend="+2" subtitle="Consistency" />
-                </div>
-
-                <div className="col-span-9 rounded-xl border border-neutral-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 px-3 py-2 flex flex-col min-h-0">
-                  <AttendanceHeatmap
-                    records={attendance}
-                    rangeStart={attendanceApiRange.from}
-                    rangeEnd={attendanceApiRange.to}
-                    userFilter={
-                      canSelectUser
-                        ? {
-                          value: filters.user,
-                          options: workoutFilterOptions.users,
-                          onChange: (user) =>
-                            setFilters((p) => ({ ...p, user })),
-                        }
-                        : undefined
-                    }
-                    viewerLabel={
-                      canSelectUser
-                        ? undefined
-                        : `Your attendance · ${authUser.displayName}`
-                    }
-                    onRefresh={refetchAttendance}
-                    refreshing={attendanceRefreshing}
+                <div className="col-span-4 flex flex-col gap-3">
+                  <StatCard
+                    label="Total Exercises"
+                    value={filteredWorkouts.length}
+                    icon={<Activity className="w-5 h-5" />}
+                    trend="+12%"
+                    subtitle="From last week"
+                    className="flex-1"
+                  />
+                  <StatCard
+                    label="Workout Days"
+                    value={new Set(filteredWorkouts.map((w) => w.date)).size}
+                    icon={<Zap className="w-5 h-5" />}
+                    trend="+2"
+                    subtitle="Consistency"
+                    className="flex-1"
                   />
                 </div>
+
+                <AttendanceHeatmap
+                  className="col-span-8"
+                  records={attendance}
+                  userFilter={
+                    canSelectUser
+                      ? {
+                        value: filters.user,
+                        options: workoutFilterOptions.users,
+                        onChange: (user) =>
+                          setFilters((p) => ({ ...p, user })),
+                      }
+                      : undefined
+                  }
+                  viewerLabel={
+                    canSelectUser
+                      ? undefined
+                      : `Your attendance · ${authUser.displayName}`
+                  }
+                  onRefresh={refetchAttendance}
+                  refreshing={attendanceRefreshing}
+                />
+
               </div>
 
-              <div className="h-[240px] shrink-0 min-h-0">
-                <WorkoutChart data={chartData} />
-              </div>
+
               <div className="flex-1 min-h-0 flex flex-col">
                 <WorkoutTable
                   workouts={filteredWorkouts}
@@ -473,11 +482,35 @@ export default function AppMain() {
 
         {/* ═══════════════ GOALS TAB ═══════════════ */}
         {activeTab === "goals" && (
-          <div
-            className="flex-1 grid gap-3"
-            style={{ gridTemplateColumns: "1fr 280px", gridTemplateRows: "auto" }}
-          >
-            <div ref={goalsSectionRef} className="overflow-auto">
+          <div className="flex-1 flex flex-col gap-3 min-h-0">
+            {canSelectUser && (
+              <div className="shrink-0 bg-white dark:bg-slate-900 border border-slate-50 dark:border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-premium dark:shadow-none">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Administration</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">User Goal Filter</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-2">Viewing:</span>
+                  <select
+                    value={filters.user}
+                    onChange={(e) => setFilters((p) => ({ ...p, user: e.target.value }))}
+                    className="h-9 pl-3 pr-8 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 ring-indigo-500/20 appearance-none cursor-pointer transition-all"
+                  >
+                    <option value="all">Global (All Users)</option>
+                    {workoutFilterOptions.users.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div ref={goalsSectionRef} className="flex-1 overflow-auto custom-scrollbar pr-1">
               <GoalsSection
                 selectedUser={canSelectUser ? filters.user : authUser.displayName}
                 currentUserName={authUser.displayName}
@@ -488,19 +521,11 @@ export default function AppMain() {
                 onUpdate={updateGoal} onDelete={deleteGoal}
               />
             </div>
-            <GoalProgressCard
-              fillHeight
-              current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
-              total={selectedGoal?.stepsGoal || 0}
-              label=" Steps"
-              onSetGoalClick={() => goalsSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
-              hasGoal={!!selectedGoal}
-            />
           </div>
         )}
 
         {/* ── Compact Footer Strip — always visible, no extra height ── */}
-        <div className="shrink-0 mt-3 pt-3 pb-3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
+        {/* <div className="shrink-0 mt-3 pt-3 pb-3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-400 tracking-tight">Fit Tracker Dashboard</span>
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hidden lg:block">
             Powered by Fitness Intelligence Team
@@ -525,7 +550,7 @@ export default function AppMain() {
               Support
             </button>
           </div>
-        </div>
+        </div> */}
 
       </main>
 

@@ -38,6 +38,9 @@ export interface GoalsRecord {
   distanceGoalKm: number;
   caloriesGoal: number;
   activeMinutesGoal: number;
+  description?: string;
+  targetValue?: number;
+  targetUnit?: string;
   isActive: boolean;
   updatedAt: string;
 }
