@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
   const accountItems = [
     { icon: Settings, label: "Settings", id: "settings" },
     { icon: Info, label: "Help", id: "help" },
-    { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
+    // { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
   ];
 
   const menuAction = (id: string) => {
@@ -73,9 +73,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     if (id === "help" || id === "support") {
       onHelp();
     }
-    if (id === "refresh" && !refreshing) {
-      onRefresh();
-    }
+    // if (id === "refresh" && !refreshing) {
+    //   onRefresh();
+    // }
     // Auto-close on mobile
     if (window.innerWidth < 1024) {
       setIsOpen(false);
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     <span className="text-sm font-semibold tracking-tight">{item.label}</span>
                   </button>
                 ))}
-                
+
                 <button
                   onClick={toggleTheme}
                   className="flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
