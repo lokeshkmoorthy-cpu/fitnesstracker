@@ -41,11 +41,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
         <h2 className="text-2xl font-semibold tracking-tight mb-2">
           {mode === "login" ? "Login" : "Create Account"}
         </h2>
-        <p className="text-sm text-slate-400 mb-5">
-          {mode === "login"
-            ? "Access your personalized fitness dashboard to track workouts, monitor progress, and achieve your health goals with advanced analytics and insights."
-            : "Join our fitness community to create your account, log detailed workouts, set goals, and get comprehensive reports on your fitness journey."}
-        </p>
+
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" ? (
             <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">

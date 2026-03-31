@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Activity,
@@ -15,7 +15,9 @@ import {
   RefreshCw,
   Info,
   Sun,
-  Moon
+  Moon,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import type { AuthUser } from "@/src/types/fitness";
@@ -34,13 +36,35 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, onLogout, onHelp, onOpenAdmin, activeItem, onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem("sidebar_collapsed") === "true";
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Check initial state applied by index.html script
     if (document.documentElement.classList.contains("dark")) {
       setIsDark(true);
     }
+
+    // Auto-collapse on smaller screens
+    const handleResize = () => {
+      if (window.innerWidth < 1280 && window.innerWidth >= 1024) {
+        setIsCollapsed(true);
+      }
+    };
+    
+    // Slight delay so it doesn't override manual setting immediately if not needed
+    // Actually safe to just run on mount/resize
+    handleResize(); 
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const toggleCollapse = () => {
+    const nextState = !isCollapsed;
+    setIsCollapsed(nextState);
+    localStorage.setItem("sidebar_collapsed", nextState.toString());
+  };
 
   const toggleTheme = () => {
     const isDarkMode = !isDark;
@@ -95,44 +119,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
       {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen w-72 bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-white/10 z-40 transition-transform duration-300 lg:translate-x-0 lg:static",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed left-0 top-0 h-screen bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-white/10 z-40 transition-all duration-300 lg:translate-x-0 lg:static flex flex-col",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+          isCollapsed ? "w-20" : "w-72"
         )}
       >
-        <div className="flex flex-col h-full p-8 overflow-y-auto scrollbar-custom">
+        <div className={cn(
+          "flex flex-col h-full overflow-y-auto scrollbar-custom",
+          isCollapsed ? "px-4 py-8 items-center" : "p-8"
+        )}>
           {/* Logo Section */}
-          <div className="flex items-center gap-3 mb-10">
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-purple-200">
-              <Bolt className="text-white w-6 h-6 fill-white/20" />
+          <div className={cn("flex items-center mb-10 w-full", isCollapsed ? "flex-col gap-4" : "justify-between")}>
+            <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-purple-200 shrink-0">
+                <Bolt className="text-white w-6 h-6 fill-white/20" />
+              </div>
+              {!isCollapsed && (
+                <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate whitespace-nowrap">
+                  Fit Tracker
+                </span>
+              )}
             </div>
-            <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Fit Tracker</span>
+            
+            <button 
+              onClick={toggleCollapse}
+              className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors shrink-0"
+              title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isCollapsed ? <ChevronRight className="w-5 h-5"/> : <ChevronLeft className="w-5 h-5"/>}
+            </button>
           </div>
 
-          <nav className="flex-1 space-y-8">
+          <nav className="flex-1 space-y-8 w-full">
             {/* Main Menu */}
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
+              {!isCollapsed ? (
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
+              ) : (
+                <div className="h-4 mb-6 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+              )}
               <div className="space-y-2">
                 {mainMenuItems.map((item) => (
                   <button
                     key={item.id}
+                    title={isCollapsed ? item.label : undefined}
                     onClick={() => menuAction(item.id)}
                     className={cn(
-                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group relative",
+                      "flex items-center rounded-2xl transition-all duration-200 group relative w-full",
+                      isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5",
                       activeItem === item.id
-                        ? "bg-slate-100 text-slate-900"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
                     )}
                   >
                     <item.icon
                       className={cn(
-                        "w-5 h-5 text-slate-500 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300 transition-colors",
-                        activeItem === item.id && "text-cyan-600"
+                        "w-5 h-5 shrink-0 transition-colors",
+                         activeItem === item.id 
+                          ? "text-cyan-600 dark:text-cyan-400"
+                          : "text-slate-500 group-hover:text-cyan-600 dark:text-slate-400 dark:group-hover:text-cyan-300"
                       )}
                     />
-                    <span className="text-sm font-semibold tracking-tight">
-                      {item.label}
-                    </span>
+                    {!isCollapsed && (
+                      <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
+                        {item.label}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -140,45 +192,66 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
 
             {/* Account */}
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Account</h3>
+              {!isCollapsed ? (
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Account</h3>
+              ) : (
+                <div className="h-4 mb-6 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+              )}
               <div className="space-y-2">
                 {accountItems.map((item) => (
                   <button
                     key={item.id}
+                    title={isCollapsed ? item.label : undefined}
                     onClick={() => menuAction(item.id)}
                     className={cn(
-                      "flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-                      activeItem === item.id && "bg-slate-100 text-slate-900"
+                      "flex items-center rounded-2xl transition-all duration-200 group w-full",
+                      isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5",
+                      activeItem === item.id 
+                        ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
                     )}
                   >
                     <item.icon className={cn(
-                      "w-5 h-5 text-slate-400 group-hover:text-slate-600",
+                      "w-5 h-5 shrink-0 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors",
                       item.id === "refresh" && refreshing && "animate-spin"
                     )} />
-                    <span className="text-sm font-semibold tracking-tight">{item.label}</span>
+                    {!isCollapsed && (
+                      <span className="text-sm font-semibold tracking-tight whitespace-nowrap">{item.label}</span>
+                    )}
                   </button>
                 ))}
                 
                 <button
                   onClick={toggleTheme}
-                  className="flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 group text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
+                  title={isCollapsed ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
+                  className={cn(
+                    "flex items-center rounded-2xl transition-all duration-200 group text-slate-500 w-full hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-200",
+                    isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5"
+                  )}
                 >
                   {isDark ? (
-                    <Sun className="w-5 h-5 text-slate-400 group-hover:text-amber-500" />
+                    <Sun className="w-5 h-5 shrink-0 text-slate-400 group-hover:text-amber-500 transition-colors" />
                   ) : (
-                    <Moon className="w-5 h-5 text-slate-400 group-hover:text-amber-500" />
+                    <Moon className="w-5 h-5 shrink-0 text-slate-400 group-hover:text-amber-500 transition-colors" />
                   )}
-                  <span className="text-sm font-semibold tracking-tight">
-                    {isDark ? "Light Mode" : "Dark Mode"}
-                  </span>
+                  {!isCollapsed && (
+                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
+                      {isDark ? "Light Mode" : "Dark Mode"}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
 
             {user.role === "admin" && onOpenAdmin && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Admin</h3>
+                {!isCollapsed ? (
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4 mt-8">Admin</h3>
+                ) : (
+                  <div className="h-4 mb-6 mt-8 border-b border-slate-200 dark:border-slate-800 w-8 mx-auto" />
+                )}
                 <button
+                  title={isCollapsed ? "Admin Console" : undefined}
                   onClick={() => {
                     onNavigate("admin");
                     onOpenAdmin();
@@ -186,29 +259,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                       setIsOpen(false);
                     }
                   }}
-                  className="flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800"
+                  className={cn(
+                    "flex items-center rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800 w-full",
+                    isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3.5"
+                  )}
                 >
-                  <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <span className="text-sm font-semibold tracking-tight">Admin Console</span>
+                  <Users className="w-5 h-5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  {!isCollapsed && (
+                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Admin Console</span>
+                  )}
                 </button>
               </div>
             )}
           </nav>
 
           {/* User Profile */}
-          <div className="mt-auto pt-8 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+          <div className={cn(
+            "mt-auto pt-8 border-t border-slate-100 dark:border-slate-800/60 flex items-center w-full",
+            isCollapsed ? "flex-col gap-4 justify-center" : "justify-between"
+          )}>
+            <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3 min-w-0")}>
+              <div className="w-11 h-11 shrink-0 rounded-full bg-slate-100 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center overflow-hidden">
                 <User className="w-6 h-6 text-slate-400 translate-y-1" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-white leading-tight">{user.displayName}</span>
-                <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">{user.email}</span>
-              </div>
+              {!isCollapsed && (
+                <div className="flex flex-col min-w-0 pr-2">
+                  <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                    {user.displayName}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">
+                    {user.email}
+                  </span>
+                </div>
+              )}
             </div>
             <button
+              title={isCollapsed ? "Log out" : undefined}
               onClick={onLogout}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+              className="p-2 shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -226,3 +314,4 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     </>
   );
 };
+
