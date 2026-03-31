@@ -87,3 +87,11 @@ export interface BotCommand {
   response: string;
   updatedAt: string;
 }
+
+export type MotivationQuoteLanguage = "ta" | "en" | "fr";
+
+export interface MotivationQuote {
+  quote: string;
+  author: string;
+  language: MotivationQuoteLanguage;
+}

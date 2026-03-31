@@ -41,6 +41,9 @@ const BOT_COMMANDS_SHEET = "BotCommands";
 const BOT_COMMANDS_RANGE = `${BOT_COMMANDS_SHEET}!A:C`;
 const ATTENDANCE_SHEET = "Attendance";
 const ATTENDANCE_RANGE = `${ATTENDANCE_SHEET}!A:F`;
+const MOTIVATION_QUOTES_SHEET = "MotivationQuotes";
+const MOTIVATION_QUOTES_RANGE = `${MOTIVATION_QUOTES_SHEET}!A:C`;
+const SUPPORTED_QUOTE_LANGUAGES = new Set(["ta", "en", "fr"]);
 
 const MOTIVATION_MESSAGES = [
   "No excuses. Just results. You showed up today — that’s how champions are built.",
@@ -155,6 +158,12 @@ interface AttendanceRecord {
   day: string;
   userId: string;
   chatId: string;
+}
+
+interface MotivationQuoteRecord {
+  quote: string;
+  author: string;
+  language: "ta" | "en" | "fr";
 }
 
 interface SafeUser {
@@ -452,6 +461,7 @@ async function ensureAuthSheets() {
       "updatedat",
     ]);
     await ensureSheetWithHeaders(ATTENDANCE_SHEET, ["Name", "Date", "Time", "Day", "User ID", "Chat ID"]);
+    await ensureSheetWithHeaders(MOTIVATION_QUOTES_SHEET, ["quote", "author", "language"]);
     console.log("Ensuring BotCommands sheet...");
     await ensureSheetWithHeaders(BOT_COMMANDS_SHEET, ["command", "response", "updatedAt"]);
     console.log("Fetching existing bot commands...");
@@ -691,6 +701,25 @@ async function getAttendanceRecords(): Promise<AttendanceRecord[]> {
       chatId: get("chatid"),
     };
   }).filter((entry) => Boolean(entry.date));
+}
+
+async function getMotivationQuotes(): Promise<MotivationQuoteRecord[]> {
+  const rows = await readSheetRows(MOTIVATION_QUOTES_RANGE);
+  const headers = ["quote", "author", "language"];
+  return mapRows(rows, headers, (row, mappedHeaders) => {
+    const get = (header: string) => row[mappedHeaders.indexOf(header)] || "";
+    const quote = get("quote").trim();
+    const author = get("author").trim();
+    const language = get("language").trim().toLowerCase();
+    if (!quote || !SUPPORTED_QUOTE_LANGUAGES.has(language)) {
+      return null;
+    }
+    return {
+      quote,
+      author,
+      language: language as MotivationQuoteRecord["language"],
+    };
+  }).filter((entry): entry is MotivationQuoteRecord => Boolean(entry));
 }
 
 async function getGoalsRecords(): Promise<GoalsRecord[]> {
@@ -1725,6 +1754,17 @@ app.get("/api/attendance", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Fetch Attendance Error:", error);
     res.status(500).json({ error: "Failed to fetch attendance data" });
+  }
+});
+
+app.get("/api/motivation-quotes", requireAuth, async (_req, res) => {
+  if (!ensureSpreadsheetId(res)) return;
+  try {
+    const quotes = await getMotivationQuotes();
+    res.json(quotes);
+  } catch (error) {
+    console.error("Fetch Motivation Quotes Error:", error);
+    res.status(500).json({ error: "Failed to fetch motivation quotes" });
   }
 });
 

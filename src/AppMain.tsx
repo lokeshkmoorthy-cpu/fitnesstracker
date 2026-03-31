@@ -4,6 +4,7 @@ import { ActivityTrendChart } from "@/src/features/activity/ActivityTrendChart";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { DashboardHero } from "@/src/components/DashboardHero";
+import { MotivationCard } from "@/src/components/MotivationCard";
 import { GoalProgressCard } from "@/src/components/GoalProgressCard";
 import { HelpModal } from "@/src/components/HelpModal";
 import { StatCard } from "@/src/components/StatCard";
@@ -28,6 +29,7 @@ import type {
   AuthUser,
   DashboardFilters,
   GoalsRecord,
+  MotivationQuote,
   StreaksResponse,
   Workout,
 } from "@/src/types/fitness";
@@ -72,6 +74,8 @@ export default function AppMain() {
   const [activity, setActivity] = useState<ActivityDailyRecord[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [goals, setGoals] = useState<GoalsRecord[]>([]);
+  const [motivationQuotes, setMotivationQuotes] = useState<MotivationQuote[]>([]);
+  const [motivationLoading, setMotivationLoading] = useState(false);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [streaks, setStreaks] = useState<StreaksResponse | null>(null);
   const [userWiseGoals, setUserWiseGoals] = useState<
@@ -243,6 +247,33 @@ export default function AppMain() {
     return () => { cancelled = true; };
   }, [authUser, filters.user, dashboardApiRange, attendanceApiRange, workoutFilterOptions.users]);
 
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+    const loadQuotes = async () => {
+      setMotivationLoading(true);
+      try {
+        const data = await fitnessApi.getMotivationQuotes();
+        if (cancelled) return;
+        const normalized = (Array.isArray(data) ? data : []).filter(
+          (entry): entry is MotivationQuote =>
+            Boolean(entry?.quote) &&
+            (entry.language === "ta" || entry.language === "en" || entry.language === "fr")
+        );
+        setMotivationQuotes(normalized);
+      } catch (error) {
+        console.error("Failed to fetch motivation quotes:", error);
+        if (!cancelled) setMotivationQuotes([]);
+      } finally {
+        if (!cancelled) setMotivationLoading(false);
+      }
+    };
+    loadQuotes();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser]);
+
   const handleLogin = async (payload: { email: string; password: string }) => {
     setAuthSubmitting(true);
     try {
@@ -384,6 +415,7 @@ export default function AppMain() {
             {/* Left: stack tightly — avoids grid row-span stretching the hero/stats row above the chart */}
             <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
               <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
+              <MotivationCard quotes={motivationQuotes} loading={motivationLoading} />
               <div className="grid grid-cols-12 gap-3 min-h-0">
                 <div className="col-span-4 flex flex-col gap-3">
                   <StatCard

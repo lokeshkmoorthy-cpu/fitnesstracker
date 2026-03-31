@@ -3,6 +3,7 @@ import type {
   AttendanceRecord,
   AuthResponse,
   AuthUser,
+  MotivationQuote,
   GoalsRecord,
   StreaksResponse,
   Workout,
@@ -118,6 +119,7 @@ export const fitnessApi = {
     }),
   getStreaks: (user: string) =>
     fetchJson<StreaksResponse>(`/api/streaks?user=${encodeURIComponent(user)}`),
+  getMotivationQuotes: () => fetchJson<MotivationQuote[]>("/api/motivation-quotes"),
   getBotCommands: () => fetchJson<import("@/src/types/fitness").BotCommand[]>("/api/bot-commands"),
   updateBotCommand: (command: string, response: string) =>
     fetchJson<{ success: boolean }>(`/api/bot-commands/${encodeURIComponent(command)}`, {
