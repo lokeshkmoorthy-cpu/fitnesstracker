@@ -39,6 +39,40 @@ const SESSIONS_SHEET = "Sessions";
 const AUDIT_SHEET = "AuditLog";
 const BOT_COMMANDS_SHEET = "BotCommands";
 const BOT_COMMANDS_RANGE = `${BOT_COMMANDS_SHEET}!A:C`;
+const ATTENDANCE_SHEET = "Attendance";
+const ATTENDANCE_RANGE = `${ATTENDANCE_SHEET}!A:F`;
+
+const MOTIVATION_MESSAGES = [
+  "No excuses. Just results. You showed up today — that’s how champions are built.",
+
+  "Discipline beats motivation. You didn’t feel like it, but you did it anyway — that’s power.",
+
+  "Every rep counts. Every day matters. Keep stacking wins.",
+
+  "Your future body is watching your decisions today. Make it proud.",
+
+  "Pain is temporary. Progress is permanent. Keep going.",
+
+  "You’re not competing with others — you’re defeating yesterday’s version of yourself.",
+
+  "Small daily efforts create massive transformations. Stay consistent.",
+
+  "Sweat today. Shine tomorrow. You’re on the right path.",
+
+  "The hardest part is showing up — and you already did that. Respect.",
+
+  "No shortcuts. No magic. Just hard work — and you’re doing it.",
+
+  "You didn’t come this far to stop now. Push one more rep.",
+
+  "Consistency is your superpower. Keep showing up.",
+
+  "Strong mind. Strong body. Strong life.",
+
+  "This is not just fitness — this is self-respect in action.",
+
+  "You are building a body that matches your mindset. Stay locked in."
+];
 
 interface WorkoutRecord {
   userId: string;
@@ -111,6 +145,15 @@ interface BotCommandRecord {
   updatedAt: string;
 }
 
+interface AttendanceRecord {
+  name: string;
+  date: string;
+  time: string;
+  day: string;
+  userId: string;
+  chatId: string;
+}
+
 interface SafeUser {
   userId: string;
   email: string;
@@ -139,7 +182,40 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 let bot: TelegramBot | null = null;
 if (token) {
   bot = new TelegramBot(token, { polling: true });
-  console.log("Telegram bot initialized (polling mode)");
+  console.log(
+    `[telegram] polling started (pid=${process.pid}). Only one process may use TELEGRAM_BOT_TOKEN; duplicate pollers cause 409 Conflict.`
+  );
+
+  let last409ExplainAt = 0;
+  bot.on("polling_error", (err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    const is409 =
+      message.includes("409") ||
+      message.includes("Conflict") ||
+      message.includes("getUpdates");
+    if (is409) {
+      const now = Date.now();
+      if (now - last409ExplainAt > 15_000) {
+        last409ExplainAt = now;
+        console.error(
+          "[telegram] 409 Conflict — another app/process is already polling Telegram with this token.\n" +
+          "  Fix: stop every other Node server, VPS, or PC using the same TELEGRAM_BOT_TOKEN (Task Manager / close extra terminals).\n" +
+          "  Until then, this process may not receive commands reliably (looks like nothing is happening)."
+        );
+      }
+    } else {
+      console.error("[telegram] polling_error:", err);
+    }
+  });
+
+  void bot
+    .getMe()
+    .then((me) => {
+      console.log(`[telegram] connected as @${me.username} (${me.first_name})`);
+    })
+    .catch((e) => {
+      console.error("[telegram] getMe failed — check TELEGRAM_BOT_TOKEN:", e);
+    });
 } else {
   console.warn("TELEGRAM_BOT_TOKEN not found. Bot functionality disabled.");
 }
@@ -157,6 +233,35 @@ const toIsoDate = (value?: string) => {
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);
 };
+
+/** Sheet + Telegram store attendance dates as en-GB DD/MM/YYYY; parse explicitly for reliable ISO output. */
+const ATTENDANCE_DDMMYYYY = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+function parseAttendanceDateToIso(value?: string): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (DATE_REGEX.test(trimmed)) return trimmed;
+  const m = trimmed.match(ATTENDANCE_DDMMYYYY);
+  if (m) {
+    const d = Number(m[1]);
+    const mo = Number(m[2]);
+    const y = Number(m[3]);
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1000 && y <= 9999) {
+      const utc = Date.UTC(y, mo - 1, d);
+      const dt = new Date(utc);
+      if (
+        dt.getUTCFullYear() === y &&
+        dt.getUTCMonth() === mo - 1 &&
+        dt.getUTCDate() === d
+      ) {
+        return dt.toISOString().slice(0, 10);
+      }
+    }
+    return "";
+  }
+  return toIsoDate(trimmed);
+}
+
 const todayIsoDate = () => new Date().toISOString().slice(0, 10);
 const nowIso = () => new Date().toISOString();
 const normalizeUser = (value: string) => value.trim();
@@ -340,6 +445,7 @@ async function ensureAuthSheets() {
       "isactive",
       "updatedat",
     ]);
+    await ensureSheetWithHeaders(ATTENDANCE_SHEET, ["Name", "Date", "Time", "Day", "User ID", "Chat ID"]);
     console.log("Ensuring BotCommands sheet...");
     await ensureSheetWithHeaders(BOT_COMMANDS_SHEET, ["command", "response", "updatedAt"]);
     console.log("Fetching existing bot commands...");
@@ -366,6 +472,10 @@ async function ensureAuthSheets() {
 }
 
 async function getUsers(): Promise<UserRecord[]> {
+  const now = Date.now();
+  if (usersCache && now - usersCache.at < USERS_CACHE_TTL_MS) {
+    return usersCache.data;
+  }
   const rows = await readSheetRows(`${USERS_SHEET}!A:L`);
   const headers = [
     "userid",
@@ -381,7 +491,7 @@ async function getUsers(): Promise<UserRecord[]> {
     "telegramusername",
     "telegramlinkedat",
   ];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
+  const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
     const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
     const getWithFallbackIndex = (name: string, fallbackIndex: number) => {
       const value = get(name);
@@ -406,6 +516,8 @@ async function getUsers(): Promise<UserRecord[]> {
       telegramLinkedAt: getWithFallbackIndex("telegramlinkedat", 11),
     };
   }).filter((user) => Boolean(user.userId && user.email));
+  usersCache = { at: now, data: list };
+  return list;
 }
 
 function serializeUserRow(user: UserRecord): Array<string | number> {
@@ -440,6 +552,10 @@ function checkTelegramLinkRate(chatId: string) {
 }
 
 async function getSessions(): Promise<SessionRecord[]> {
+  const now = Date.now();
+  if (sessionsCache && now - sessionsCache.at < SESSIONS_CACHE_TTL_MS) {
+    return sessionsCache.data;
+  }
   const rows = await readSheetRows(`${SESSIONS_SHEET}!A:H`);
   const headers = [
     "sessionid",
@@ -451,7 +567,7 @@ async function getSessions(): Promise<SessionRecord[]> {
     "ip",
     "useragent",
   ];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
+  const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
     const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
     return {
       rowIndex,
@@ -465,6 +581,8 @@ async function getSessions(): Promise<SessionRecord[]> {
       userAgent: get("useragent"),
     };
   }).filter((session) => Boolean(session.sessionId && session.tokenHash));
+  sessionsCache = { at: now, data: list };
+  return list;
 }
 
 async function logAuditEvent(
@@ -551,6 +669,22 @@ async function getActivityRecords(workouts: WorkoutRecord[]): Promise<ActivityDa
     current.activeMinutes += 20;
   });
   return Array.from(map.values());
+}
+
+async function getAttendanceRecords(): Promise<AttendanceRecord[]> {
+  const rows = await readSheetRows(ATTENDANCE_RANGE);
+  const headers = ["name", "date", "time", "day", "userid", "chatid"];
+  return mapRows(rows, headers, (row, actualHeaders) => {
+    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
+    return {
+      name: get("name"),
+      date: parseAttendanceDateToIso(get("date")),
+      time: get("time"),
+      day: get("day"),
+      userId: get("userid"),
+      chatId: get("chatid"),
+    };
+  }).filter((entry) => Boolean(entry.date));
 }
 
 async function getGoalsRecords(): Promise<GoalsRecord[]> {
@@ -649,6 +783,37 @@ async function getBotCommands(): Promise<BotCommandRecord[]> {
   }).filter((cmd) => Boolean(cmd.command));
 }
 
+/** Cuts Google Sheets reads on every API request (requireAuth reads Sessions + Users). */
+const SESSIONS_CACHE_TTL_MS = 5000;
+const USERS_CACHE_TTL_MS = 5000;
+let sessionsCache: { at: number; data: SessionRecord[] } | null = null;
+let usersCache: { at: number; data: UserRecord[] } | null = null;
+
+function invalidateSessionsCache() {
+  sessionsCache = null;
+}
+
+function invalidateUsersCache() {
+  usersCache = null;
+}
+
+const BOT_COMMANDS_CACHE_TTL_MS = 45_000;
+let botCommandsCache: { at: number; commands: BotCommandRecord[] } | null = null;
+
+function invalidateBotCommandsCache() {
+  botCommandsCache = null;
+}
+
+async function getBotCommandsCached(): Promise<BotCommandRecord[]> {
+  const now = Date.now();
+  if (botCommandsCache && now - botCommandsCache.at < BOT_COMMANDS_CACHE_TTL_MS) {
+    return botCommandsCache.commands;
+  }
+  const commands = await getBotCommands();
+  botCommandsCache = { at: now, commands };
+  return commands;
+}
+
 function serializeBotCommandRow(cmd: BotCommandRecord): Array<string | number> {
   return [cmd.command, cmd.response, cmd.updatedAt];
 }
@@ -670,6 +835,7 @@ async function updateBotCommand(command: string, response: string) {
   } else {
     await appendSheetRow(`${BOT_COMMANDS_SHEET}!A:C`, [command, response, now]);
   }
+  invalidateBotCommandsCache();
 }
 
 function toPublicGoal(goal: GoalsRecord) {
@@ -714,6 +880,7 @@ async function createSession(userId: string, req: express.Request) {
     readClientIp(req),
     String(req.headers["user-agent"] || ""),
   ]);
+  invalidateSessionsCache();
   return { sessionId, tokenValue, expiresAt };
 }
 
@@ -788,17 +955,17 @@ const requireAuth: express.RequestHandler = async (req, res, next) => {
 
 const requireRole =
   (role: Role): express.RequestHandler =>
-  (req, res, next) => {
-    if (!req.authUser) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    if (req.authUser.role !== role) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
-    next();
-  };
+    (req, res, next) => {
+      if (!req.authUser) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (req.authUser.role !== role) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      next();
+    };
 
 function scopedUserId(req: express.Request, userRaw: string | undefined) {
   const authUser = req.authUser;
@@ -828,219 +995,462 @@ function parseWorkoutManual(text: string, username: string) {
   };
 }
 
+/** Telegram / IME may use fullwidth or other slash characters; strip must not turn /today into today. */
+function normalizeTelegramBotCommand(rawCommand: string): string {
+  let s = rawCommand.toLowerCase().split("@")[0].trim();
+  s = s.replace(/^[\uFF0F\u2044\u2215\u29F8]/, "/");
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, "");
+  s = s.replace(/[^\x00-\x7F]/g, "");
+  if (!s.startsWith("/")) {
+    const bare = ["start", "link", "verify", "unlink", "today", "in"];
+    if (bare.includes(s)) s = `/${s}`;
+  }
+  return s;
+}
+
+function normalizeTelegramCommandLine(text: string): string {
+  let s = text.trim();
+  s = s.replace(/^[\uFF0F\u2044\u2215\u29F8]/, "/");
+  return s;
+}
+
+/** Set TELEGRAM_DEBUG_COMMANDS=0 to silence [tg-cmd] logs */
+const TELEGRAM_DEBUG_COMMANDS = process.env.TELEGRAM_DEBUG_COMMANDS !== "0";
+
+function charCodesPreview(s: string, maxChars = 12): string {
+  return [...s.slice(0, maxChars)]
+    .map((ch) => `${JSON.stringify(ch)}:${ch.charCodeAt(0)}`)
+    .join(" ");
+}
+
+function logTelegramCommandDebug(
+  phase: string,
+  payload: Record<string, unknown>
+) {
+  if (!TELEGRAM_DEBUG_COMMANDS) return;
+  console.log(`[tg-cmd] ${phase}`, JSON.stringify(payload, null, 2));
+}
+
+/**
+ * Built-in slash commands (handled in code, not from the BotCommands sheet).
+ * Order of handling: (1) these commands, (2) BotCommands sheet rows, (3) unknown.
+ * Sheet rows whose normalized command matches a built-in are ignored so admins cannot override /start, /link, etc.
+ * If Telegram shows different text (e.g. unknown message without /today), another process is likely running old code; use a single poller.
+ */
+const TELEGRAM_BUILTIN_COMMANDS = new Set<string>([
+  "/start",
+  "/link",
+  "/verify",
+  "/unlink",
+  "/in",
+  "/today",
+]);
+
+function normalizeSheetStoredCommand(stored: string): string {
+  const t = stored.trim().toLowerCase().split("@")[0];
+  const withSlash = t.startsWith("/") ? t : `/${t}`;
+  return normalizeTelegramBotCommand(withSlash);
+}
+
+function findSheetBotCommand(
+  normalizedCommand: string,
+  sheetRows: BotCommandRecord[]
+): BotCommandRecord | undefined {
+  for (const row of sheetRows) {
+    const key = normalizeSheetStoredCommand(row.command);
+    if (TELEGRAM_BUILTIN_COMMANDS.has(key)) continue;
+    if (key === normalizedCommand) return row;
+  }
+  return undefined;
+}
+
+/** Command names from the BotCommands sheet (excludes built-ins like /today) for /today follow-up hints. */
+function formatWorkoutCommandsSection(sheetRows: BotCommandRecord[]): string {
+  const names = sheetRows
+    .map((r) => normalizeSheetStoredCommand(r.command))
+    .filter((cmd) => !TELEGRAM_BUILTIN_COMMANDS.has(cmd))
+    .sort((a, b) => a.localeCompare(b));
+  if (names.length === 0) return "—";
+  return names.map((c) => `• ${c}`).join("\n");
+}
+
+type TelegramSlashContext = {
+  bot: TelegramBot;
+  msg: TelegramBot.Message;
+  chatId: number;
+  chatIdText: string;
+  telegramUsername: string;
+  command: string;
+  args: string[];
+  /** Full line after slash normalization (e.g. "/link a@b.com") */
+  commandLine: string;
+  /** Original trimmed user text */
+  trimmedText: string;
+};
+
+async function telegramBuiltinStart(ctx: TelegramSlashContext): Promise<void> {
+  await ctx.bot.sendMessage(
+    ctx.chatId,
+    `Welcome to FitSheet Bot!
+
+Link your account:
+1) /link your-email@example.com
+2) /verify 123456
+
+Commands:
+- /in or /today — Mark attendance
+- /unlink — Remove link`
+  );
+}
+
+async function telegramBuiltinLink(ctx: TelegramSlashContext): Promise<void> {
+  const email = normalizeEmail(ctx.args.join(" "));
+  if (!EMAIL_REGEX.test(email)) {
+    await ctx.bot.sendMessage(ctx.chatId, "Invalid email format.");
+    return;
+  }
+  try {
+    const users = await getUsers();
+    const user = users.find((u) => u.email === email && u.isActive);
+    if (!user) {
+      await ctx.bot.sendMessage(ctx.chatId, "No active account found.");
+      return;
+    }
+    const code = generateOtpCode();
+    telegramPendingLinks.set(ctx.chatIdText, {
+      userId: user.userId,
+      email: user.email,
+      code,
+      expiresAt: Date.now() + TELEGRAM_LINK_CODE_TTL_MS,
+      attempts: 0,
+    });
+    await ctx.bot.sendMessage(
+      ctx.chatId,
+      `Verification code: ${code}\nUse /verify ${code}`
+    );
+  } catch {
+    await ctx.bot.sendMessage(ctx.chatId, "Link failed.");
+  }
+}
+
+async function telegramBuiltinVerify(ctx: TelegramSlashContext): Promise<void> {
+  const code = (ctx.args[0] || "").trim();
+  const pending = telegramPendingLinks.get(ctx.chatIdText);
+  if (!pending) {
+    await ctx.bot.sendMessage(ctx.chatId, "Run /link first.");
+    return;
+  }
+  if (pending.code !== code) {
+    await ctx.bot.sendMessage(ctx.chatId, "Invalid code.");
+    return;
+  }
+  try {
+    const users = await getUsers();
+    const user = users.find((u) => u.userId === pending.userId);
+    if (!user) {
+      await ctx.bot.sendMessage(ctx.chatId, "User not found.");
+      return;
+    }
+    const updatedUser = {
+      ...user,
+      telegramChatId: ctx.chatIdText,
+      telegramUsername: ctx.telegramUsername,
+      telegramLinkedAt: nowIso(),
+    };
+    await updateSheetRow(
+      `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
+      serializeUserRow(updatedUser)
+    );
+    invalidateUsersCache();
+    telegramPendingLinks.delete(ctx.chatIdText);
+    await ctx.bot.sendMessage(ctx.chatId, "✅ Linked successfully!");
+  } catch {
+    await ctx.bot.sendMessage(ctx.chatId, "Verification failed.");
+  }
+}
+
+async function telegramBuiltinUnlink(ctx: TelegramSlashContext): Promise<void> {
+  try {
+    const users = await getUsers();
+    const user = users.find((u) => u.telegramChatId === ctx.chatIdText);
+    if (!user) {
+      await ctx.bot.sendMessage(ctx.chatId, "No linked account.");
+      return;
+    }
+    const updatedUser = {
+      ...user,
+      telegramChatId: "",
+      telegramUsername: "",
+      telegramLinkedAt: "",
+    };
+    await updateSheetRow(
+      `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
+      serializeUserRow(updatedUser)
+    );
+    invalidateUsersCache();
+    await ctx.bot.sendMessage(ctx.chatId, "Unlinked successfully.");
+  } catch {
+    await ctx.bot.sendMessage(ctx.chatId, "Unlink failed.");
+  }
+}
+
+async function telegramBuiltinToday(ctx: TelegramSlashContext): Promise<void> {
+  try {
+    const users = await getUsers();
+    const linkedUser = users.find(
+      (u) => u.telegramChatId === ctx.chatIdText && u.isActive
+    );
+    if (!linkedUser) {
+      await ctx.bot.sendMessage(
+        ctx.chatId,
+        "⚠️ Please link your account using /link"
+      );
+      return;
+    }
+    const name =
+      linkedUser.displayName || ctx.msg.from?.first_name || "Unknown";
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-GB");
+    const timeStr = now.toLocaleTimeString("en-GB");
+    const dayStr = now.toLocaleDateString("en-US", { weekday: "long" });
+    const rows = await readSheetRows(ATTENDANCE_RANGE);
+    const alreadyMarked = rows.some((r) => r[0] === name && r[1] === dateStr);
+    const randomMotivation =
+      MOTIVATION_MESSAGES[
+      Math.floor(Math.random() * MOTIVATION_MESSAGES.length)
+      ];
+    let workoutCommandsBlock = "—";
+    try {
+      const sheetCommands = await getBotCommandsCached();
+      workoutCommandsBlock = formatWorkoutCommandsSection(sheetCommands);
+    } catch {
+      /* keep placeholder */
+    }
+
+    if (alreadyMarked) {
+      await ctx.bot.sendMessage(
+        ctx.chatId,
+        [
+          "⚠️ You already marked attendance today.",
+          "",
+          `✨ ${randomMotivation}`,
+          "",
+          "📋 Workout commands (tap to send):",
+          workoutCommandsBlock,
+        ].join("\n")
+      );
+      return;
+    }
+    await appendSheetRow(ATTENDANCE_RANGE, [
+      name,
+      dateStr,
+      timeStr,
+      dayStr,
+      linkedUser.userId,
+      ctx.chatIdText,
+    ]);
+    await ctx.bot.sendMessage(
+      ctx.chatId,
+      [
+        "✅ Attendance recorded successfully!",
+        "",
+        `✨ ${randomMotivation}`,
+        "",
+        "📋 Workout commands (tap to send):",
+        workoutCommandsBlock,
+      ].join("\n")
+    );
+  } catch (err) {
+    console.error(err);
+    await ctx.bot.sendMessage(ctx.chatId, "❌ Failed to mark attendance.");
+  }
+}
+
+async function dispatchTelegramBuiltinSlashCommand(
+  ctx: TelegramSlashContext
+): Promise<boolean> {
+  if (!TELEGRAM_BUILTIN_COMMANDS.has(ctx.command)) return false;
+  logTelegramCommandDebug("branch", {
+    messageId: ctx.msg.message_id,
+    route: "builtin",
+    command: ctx.command,
+  });
+  switch (ctx.command) {
+    case "/start":
+      await telegramBuiltinStart(ctx);
+      return true;
+    case "/link":
+      await telegramBuiltinLink(ctx);
+      return true;
+    case "/verify":
+      await telegramBuiltinVerify(ctx);
+      return true;
+    case "/unlink":
+      await telegramBuiltinUnlink(ctx);
+      return true;
+    case "/in":
+    case "/today":
+      await telegramBuiltinToday(ctx);
+      return true;
+    default:
+      return false;
+  }
+}
+
+async function dispatchTelegramSheetSlashCommand(
+  ctx: TelegramSlashContext
+): Promise<boolean> {
+  try {
+    const sheetRows = await getBotCommandsCached();
+    logTelegramCommandDebug("sheet_lookup", {
+      messageId: ctx.msg.message_id,
+      command: ctx.command,
+      sheetCommandCount: sheetRows.length,
+      sheetCommandsSample: sheetRows
+        .slice(0, 15)
+        .map((c) => normalizeSheetStoredCommand(c.command)),
+    });
+    const matched = findSheetBotCommand(ctx.command, sheetRows);
+    if (!matched) return false;
+    logTelegramCommandDebug("branch", {
+      messageId: ctx.msg.message_id,
+      route: "sheet",
+      command: ctx.command,
+      responseLength: matched.response?.length ?? 0,
+    });
+    await ctx.bot.sendMessage(ctx.chatId, matched.response);
+    return true;
+  } catch (err) {
+    console.error("[tg-cmd] Command fetch error:", err);
+    return false;
+  }
+}
+
+async function handleTelegramSlashCommand(
+  ctx: TelegramSlashContext
+): Promise<void> {
+  const isBuiltin = TELEGRAM_BUILTIN_COMMANDS.has(ctx.command);
+  logTelegramCommandDebug("command_message", {
+    phase: "parsed",
+    messageId: ctx.msg.message_id,
+    chatId: ctx.chatId,
+    fromId: ctx.msg.from?.id,
+    username: ctx.msg.from?.username ?? ctx.msg.from?.first_name,
+    trimmedText: ctx.trimmedText,
+    commandLine: ctx.commandLine,
+    rawCommand: ctx.commandLine.split(/\s+/)[0],
+    args: ctx.args,
+    normalizedCommand: ctx.command,
+    isBuiltin,
+    charCodesHead: charCodesPreview(ctx.trimmedText),
+    entities: ctx.msg.entities,
+  });
+
+  if (await dispatchTelegramBuiltinSlashCommand(ctx)) return;
+  if (await dispatchTelegramSheetSlashCommand(ctx)) return;
+
+  logTelegramCommandDebug("branch", {
+    messageId: ctx.msg.message_id,
+    route: "unknown_command",
+    command: ctx.command,
+    reason: "not_builtin_and_not_in_sheet",
+  });
+  await ctx.bot.sendMessage(
+    ctx.chatId,
+    [
+      "Unknown command.",
+      "",
+      "Built-in: /start, /link, /verify, /unlink, /in, /today",
+      "( /in and /today both mark attendance )",
+      "",
+      "Other commands may come from your BotCommands sheet (e.g. /chest).",
+    ].join("\n")
+  );
+}
+
+/** Same Telegram update delivered twice in one process (rare); skip duplicate handling. */
+const TELEGRAM_UPDATE_DEDUP_MS = 120_000;
+const processedTelegramUpdates = new Map<string, number>();
+
+function consumeTelegramUpdateIfNew(msg: TelegramBot.Message): boolean {
+  const key = `${msg.chat.id}:${msg.message_id}`;
+  const now = Date.now();
+  for (const [k, t] of processedTelegramUpdates) {
+    if (now - t > TELEGRAM_UPDATE_DEDUP_MS) processedTelegramUpdates.delete(k);
+  }
+  if (processedTelegramUpdates.has(key)) return false;
+  processedTelegramUpdates.set(key, now);
+  return true;
+}
+
 if (bot) {
   bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
-    const telegramUsername = normalizeTelegramUsername(msg.from?.username || msg.from?.first_name);
-    const chatIdText = normalizeChatId(chatId);
+
     if (!text) return;
-    const trimmedText = text.trim();
-    if (!trimmedText) return;
 
-    if (trimmedText.startsWith("/")) {
-      const [rawCommand, ...args] = trimmedText.split(/\s+/);
-      const command = rawCommand.toLowerCase();
-
-      if (command === "/start") {
-        bot?.sendMessage(
-          chatId,
-          "Welcome to FitSheet Bot!\n\nLink your account first:\n1) /link your-email@example.com\n2) /verify 123456\n\nThen log workouts using:\nMuscle Group - Exercises - Sets/Reps"
-        );
-        return;
-      }
-
-      const botCommands = await getBotCommands();
-      const matched = botCommands.find((c) => c.command.toLowerCase() === command);
-      if (matched) {
-        bot?.sendMessage(chatId, matched.response);
-        return;
-      }
-
-      if (command === "/link") {
-        const email = normalizeEmail(args.join(" "));
-        if (!EMAIL_REGEX.test(email)) {
-          bot?.sendMessage(chatId, "Invalid email format. Use: /link your-email@example.com");
-          return;
-        }
-        const rate = checkTelegramLinkRate(chatIdText);
-        if (rate.blocked) {
-          bot?.sendMessage(chatId, "Too many link attempts. Please wait a few minutes and try again.");
-          return;
-        }
-        try {
-          const users = await getUsers();
-          const user = users.find((entry) => entry.email === email && entry.isActive);
-          if (!user) {
-            bot?.sendMessage(chatId, "No active account found for this email.");
-            return;
-          }
-          if (user.telegramChatId && user.telegramChatId !== chatIdText) {
-            bot?.sendMessage(
-              chatId,
-              "This account is already linked to another Telegram chat. Use /unlink from that chat first."
-            );
-            return;
-          }
-          const linkedElsewhere = users.find(
-            (entry) => entry.telegramChatId === chatIdText && entry.userId !== user.userId && entry.isActive
-          );
-          if (linkedElsewhere) {
-            bot?.sendMessage(
-              chatId,
-              `This Telegram chat is linked to another account (${linkedElsewhere.email}). Use /unlink first.`
-            );
-            return;
-          }
-          const code = generateOtpCode();
-          telegramPendingLinks.set(chatIdText, {
-            userId: user.userId,
-            email: user.email,
-            code,
-            expiresAt: Date.now() + TELEGRAM_LINK_CODE_TTL_MS,
-            attempts: 0,
-          });
-          await logAuditEvent(user.userId, "telegram_link_code_sent", user.userId, {
-            chatId: chatIdText,
-            telegramUsername,
-          });
-          bot?.sendMessage(
-            chatId,
-            `Verification code: ${code}\nUse /verify ${code} within 10 minutes to link this Telegram chat.`
-          );
-        } catch (error) {
-          console.error("Telegram link request error:", error);
-          bot?.sendMessage(chatId, "Failed to start account linking. Please try again.");
-        }
-        return;
-      }
-
-      if (command === "/verify") {
-        const code = (args[0] || "").trim();
-        if (!code) {
-          bot?.sendMessage(chatId, "Missing code. Use: /verify 123456");
-          return;
-        }
-        const pending = telegramPendingLinks.get(chatIdText);
-        if (!pending) {
-          bot?.sendMessage(chatId, "No pending link request. Start with /link your-email@example.com");
-          return;
-        }
-        if (Date.now() > pending.expiresAt) {
-          telegramPendingLinks.delete(chatIdText);
-          bot?.sendMessage(chatId, "Verification code expired. Run /link again.");
-          return;
-        }
-        if (pending.attempts >= TELEGRAM_MAX_VERIFY_ATTEMPTS) {
-          telegramPendingLinks.delete(chatIdText);
-          bot?.sendMessage(chatId, "Too many incorrect attempts. Run /link again.");
-          return;
-        }
-        if (pending.code !== code) {
-          pending.attempts += 1;
-          bot?.sendMessage(chatId, "Invalid code. Please try again.");
-          return;
-        }
-        try {
-          const users = await getUsers();
-          const user = users.find(
-            (entry) => entry.userId === pending.userId && entry.email === pending.email && entry.isActive
-          );
-          if (!user) {
-            telegramPendingLinks.delete(chatIdText);
-            bot?.sendMessage(chatId, "User account not found or inactive. Please sign in and try again.");
-            return;
-          }
-          const linkedElsewhere = users.find(
-            (entry) => entry.telegramChatId === chatIdText && entry.userId !== user.userId && entry.isActive
-          );
-          if (linkedElsewhere) {
-            bot?.sendMessage(chatId, "This Telegram chat is already linked to another account.");
-            return;
-          }
-          if (user.telegramChatId && user.telegramChatId !== chatIdText) {
-            bot?.sendMessage(
-              chatId,
-              "Your account is linked to another Telegram chat. Use /unlink on that chat first."
-            );
-            return;
-          }
-          const updatedUser: UserRecord = {
-            ...user,
-            updatedAt: nowIso(),
-            telegramChatId: chatIdText,
-            telegramUsername,
-            telegramLinkedAt: nowIso(),
-          };
-          await updateSheetRow(
-            `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
-            serializeUserRow(updatedUser)
-          );
-          telegramPendingLinks.delete(chatIdText);
-          await logAuditEvent(user.userId, "telegram_link_success", user.userId, {
-            chatId: chatIdText,
-            telegramUsername,
-          });
-          bot?.sendMessage(
-            chatId,
-            `Linked successfully with ${user.email}. You can now send workout logs.`
-          );
-        } catch (error) {
-          console.error("Telegram verify error:", error);
-          bot?.sendMessage(chatId, "Failed to verify code. Please try again.");
-        }
-        return;
-      }
-
-      if (command === "/unlink") {
-        try {
-          const users = await getUsers();
-          const user = users.find((entry) => entry.telegramChatId === chatIdText && entry.isActive);
-          if (!user) {
-            bot?.sendMessage(chatId, "No linked account found for this Telegram chat.");
-            return;
-          }
-          const updatedUser: UserRecord = {
-            ...user,
-            updatedAt: nowIso(),
-            telegramChatId: "",
-            telegramUsername: "",
-            telegramLinkedAt: "",
-          };
-          await updateSheetRow(
-            `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
-            serializeUserRow(updatedUser)
-          );
-          telegramPendingLinks.delete(chatIdText);
-          await logAuditEvent(user.userId, "telegram_unlink", user.userId, { chatId: chatIdText });
-          bot?.sendMessage(chatId, "Telegram chat unlinked successfully.");
-        } catch (error) {
-          console.error("Telegram unlink error:", error);
-          bot?.sendMessage(chatId, "Failed to unlink account. Please try again.");
-        }
-        return;
-      }
-
-      bot?.sendMessage(chatId, "Unknown command. Use /link, /verify, /unlink, or /start.");
+    if (!consumeTelegramUpdateIfNew(msg)) {
+      logTelegramCommandDebug("dedup_skip", {
+        messageId: msg.message_id,
+        chatId: msg.chat.id,
+      });
       return;
     }
 
-    if (!SPREADSHEET_ID) return;
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    const telegramUsername = normalizeTelegramUsername(
+      msg.from?.username || msg.from?.first_name
+    );
+
+    const chatIdText = normalizeChatId(chatId);
+
+    const commandLine = normalizeTelegramCommandLine(trimmedText);
+    const looksSlashLike =
+      trimmedText.startsWith("/") ||
+      /^[\uFF0F\u2044\u2215\u29F8]/.test(trimmedText.trim());
+
+    if (commandLine.startsWith("/")) {
+      const [rawCommand, ...args] = commandLine.split(/\s+/);
+      const command = normalizeTelegramBotCommand(rawCommand);
+      await handleTelegramSlashCommand({
+        bot,
+        msg,
+        chatId,
+        chatIdText,
+        telegramUsername,
+        command,
+        args,
+        commandLine,
+        trimmedText,
+      });
+      return;
+    }
+
+    if (looksSlashLike && !commandLine.startsWith("/")) {
+      logTelegramCommandDebug("slash_mismatch", {
+        messageId: msg.message_id,
+        chatId,
+        trimmedText,
+        commandLine,
+        charCodesHead: charCodesPreview(trimmedText),
+        note: "Message looked like a slash command after trim but normalized line does not start with /",
+      });
+    }
+
     try {
       const users = await getUsers();
-      const linkedUser = users.find((entry) => entry.telegramChatId === chatIdText && entry.isActive);
+      const linkedUser = users.find((u) => u.telegramChatId === chatIdText);
+
       if (!linkedUser) {
-        bot?.sendMessage(
-          chatId,
-          "This Telegram chat is not linked. Link first using /link your-email@example.com"
-        );
-        await logAuditEvent("system", "telegram_workout_rejected_unlinked", chatIdText, {
-          chatId: chatIdText,
-          telegramUsername,
-        });
+        await bot.sendMessage(chatId, "Link account first using /link");
         return;
       }
+
       const workout = parseWorkoutManual(trimmedText, linkedUser.displayName);
+
       await appendSheetRow(WORKOUTS_RANGE, [
         workout.username,
         workout.date,
@@ -1049,19 +1459,14 @@ if (bot) {
         workout.setsReps,
         workout.notes,
       ]);
-      await logAuditEvent(linkedUser.userId, "telegram_workout_logged", linkedUser.userId, {
-        chatId: chatIdText,
-        telegramUsername,
-        muscleGroup: workout.muscleGroup,
-      });
-      bot?.sendMessage(chatId, `Logged ${workout.muscleGroup} workout.`);
-    } catch (error) {
-      console.error("Google Sheets Error:", error);
-      await logAuditEvent("system", "telegram_workout_failed", chatIdText, {
-        chatId: chatIdText,
-        telegramUsername,
-      });
-      bot?.sendMessage(chatId, "Failed to log workout.");
+
+      await bot.sendMessage(
+        chatId,
+        `Logged ${workout.muscleGroup} workout 💪`
+      );
+    } catch (err) {
+      console.error(err);
+      await bot.sendMessage(chatId, "Workout log failed.");
     }
   });
 }
@@ -1108,6 +1513,7 @@ app.post("/api/auth/signup", async (req, res) => {
       "",
       "",
     ]);
+    invalidateUsersCache();
 
     const session = await createSession(userId, req);
     await logAuditEvent(userId, "signup", userId, { email, role });
@@ -1123,7 +1529,6 @@ app.post("/api/auth/signup", async (req, res) => {
     res.status(500).json({ error: "Failed to sign up user" });
   }
 });
-
 app.post("/api/auth/login", async (req, res) => {
   if (!ensureSpreadsheetId(res)) return;
   const email = normalizeEmail(String(req.body?.email || ""));
@@ -1166,6 +1571,7 @@ app.post("/api/auth/login", async (req, res) => {
       `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
+    invalidateUsersCache();
     const session = await createSession(user.userId, req);
     await logAuditEvent(user.userId, "login_success", user.userId, { email });
     res.json({
@@ -1198,6 +1604,7 @@ app.post("/api/auth/logout", requireAuth, async (req, res) => {
         session.ip,
         session.userAgent,
       ]);
+      invalidateSessionsCache();
     }
     await logAuditEvent(req.authUser.userId, "logout", req.authUser.userId, {});
     res.json({ success: true });
@@ -1272,6 +1679,34 @@ app.get("/api/activity/daily", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Fetch Activity Error:", error);
     res.status(500).json({ error: "Failed to fetch activity data" });
+  }
+});
+
+app.get("/api/attendance", requireAuth, async (req, res) => {
+  if (!ensureSpreadsheetId(res)) return;
+  const userRaw = typeof req.query.user === "string" ? req.query.user : "all";
+  const fromRaw = typeof req.query.from === "string" ? req.query.from : undefined;
+  const toRaw = typeof req.query.to === "string" ? req.query.to : undefined;
+  const rangeResult = parseDateRange(fromRaw, toRaw);
+  if ("error" in rangeResult) {
+    return res.status(400).json({ error: rangeResult.error });
+  }
+  // When the dashboard sends no end date, include sheet rows on or after "today" (e.g. future-dated rows).
+  const hasExplicitTo = typeof toRaw === "string" && toRaw.trim() !== "";
+  const rangeEnd = hasExplicitTo ? rangeResult.to : "9999-12-31";
+  try {
+    const records = await getAttendanceRecords();
+    const scopedId = scopedUserId(req, userRaw);
+    const scopedName = scopedUsername(req, userRaw);
+    const filtered = records.filter((entry) => {
+      const inRange = entry.date >= rangeResult.from && entry.date <= rangeEnd;
+      if (scopedId === "all") return inRange;
+      return inRange && (entry.userId === scopedId || entry.name === scopedName);
+    });
+    res.json(filtered);
+  } catch (error) {
+    console.error("Fetch Attendance Error:", error);
+    res.status(500).json({ error: "Failed to fetch attendance data" });
   }
 });
 
@@ -1587,11 +2022,20 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
-    app.use(vite.middlewares);
+    // Do not let Vite SPA fallback answer /api/* — that returns index.html and breaks fetchJson.
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/api")) {
+        return res.status(404).json({ error: "API route not found", path: req.path });
+      }
+      return vite.middlewares(req, res, next);
+    });
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/api")) {
+        return res.status(404).json({ error: "API route not found" });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -1602,1623 +2046,3 @@ async function startServer() {
 }
 
 startServer();
-/* Legacy duplicated block below is intentionally disabled.
-import express from "express";
-import path from "path";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { createServer as createViteServer } from "vite";
-import TelegramBot from "node-telegram-bot-api";
-import { google } from "googleapis";
-import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-declare global {
-  namespace Express {
-    interface Request {
-      authUser?: SafeUser;
-      authSessionToken?: string;
-      authSessionId?: string;
-    }
-  }
-}
-
-const app = express();
-const PORT = 3030;
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOGIN_WINDOW_MS = 1000 * 60 * 15;
-const WORKOUTS_RANGE = "Sheet1!A:F";
-const ACTIVITY_RANGE = "Activity!A:H";
-const GOALS_RANGE = "Sheet2!A:I";
-const USERS_SHEET = "Users";
-const SESSIONS_SHEET = "Sessions";
-const AUDIT_SHEET = "AuditLog";
-
-interface WorkoutRecord {
-  userId: string;
-  username: string;
-  date: string;
-  musclegroup: string;
-  exercises: string;
-  setsreps: string;
-  notes: string;
-}
-
-interface ActivityDailyRecord {
-  userId: string;
-  username: string;
-  date: string;
-  steps: number;
-  distanceKm: number;
-  calories: number;
-  activeMinutes: number;
-  notes: string;
-}
-
-interface GoalsRecord {
-  userId: string;
-  username: string;
-  period: "daily" | "weekly";
-  stepsGoal: number;
-  distanceGoalKm: number;
-  caloriesGoal: number;
-  activeMinutesGoal: number;
-  updatedAt: string;
-}
-
-interface UserRecord {
-  rowIndex: number;
-  userId: string;
-  email: string;
-  passwordHash: string;
-  displayName: string;
-  role: "user" | "admin";
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
-}
-
-interface SessionRecord {
-  rowIndex: number;
-  sessionId: string;
-  userId: string;
-  tokenHash: string;
-  expiresAt: string;
-  createdAt: string;
-  revokedAt: string;
-  ip: string;
-  userAgent: string;
-}
-
-interface SafeUser {
-  userId: string;
-  email: string;
-  displayName: string;
-  role: "user" | "admin";
-}
-
-type Role = "user" | "admin";
-
-const loginAttemptMap = new Map<string, { attempts: number; firstAt: number; blockedUntil: number }>();
-
-const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
-
-const sheets = google.sheets({ version: "v4", auth });
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
-
-const token = process.env.TELEGRAM_BOT_TOKEN;
-let bot: TelegramBot | null = null;
-if (token) {
-  bot = new TelegramBot(token, { polling: true });
-  console.log("Telegram bot initialized (polling mode)");
-} else {
-  console.warn("TELEGRAM_BOT_TOKEN not found. Bot functionality disabled.");
-}
-
-const normalizeHeader = (value: string) =>
-  value.toLowerCase().replace(/\s/g, "").replace(/_/g, "");
-const safeNumber = (value: string | undefined) => {
-  const parsed = Number(value ?? "");
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-const toIsoDate = (value?: string) => {
-  if (!value) return "";
-  if (DATE_REGEX.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toISOString().slice(0, 10);
-};
-const todayIsoDate = () => new Date().toISOString().slice(0, 10);
-const nowIso = () => new Date().toISOString();
-const normalizeUser = (value: string) => value.trim();
-const makeUserId = (username: string) =>
-  normalizeUser(username || "unknown")
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-const hashToken = (tokenValue: string) =>
-  createHash("sha256").update(tokenValue).digest("hex");
-const normalizeEmail = (value: string) => value.trim().toLowerCase();
-
-const ensureSpreadsheetId = (res: express.Response) => {
-  if (!SPREADSHEET_ID) {
-    res.status(500).json({ error: "GOOGLE_SHEET_ID not configured" });
-    return false;
-  }
-  return true;
-};
-
-const parseDateRange = (
-  fromRaw: string | undefined,
-  toRaw: string | undefined
-): { from: string; to: string } | { error: string } => {
-  const from = toIsoDate(fromRaw) || "1970-01-01";
-  const to = toIsoDate(toRaw) || todayIsoDate();
-  if (from > to) return { error: "Invalid range: from must be <= to" };
-  return { from, to };
-};
-
-const isGoalMet = (activity: ActivityDailyRecord, goal: GoalsRecord) => {
-  const checks = [
-    goal.stepsGoal > 0 ? activity.steps >= goal.stepsGoal : true,
-    goal.distanceGoalKm > 0 ? activity.distanceKm >= goal.distanceGoalKm : true,
-    goal.caloriesGoal > 0 ? activity.calories >= goal.caloriesGoal : true,
-    goal.activeMinutesGoal > 0 ? activity.activeMinutes >= goal.activeMinutesGoal : true,
-  ];
-  return checks.every(Boolean);
-};
-
-async function readSheetRows(range: string) {
-  if (!SPREADSHEET_ID) return [];
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-  });
-  return response.data.values || [];
-}
-
-async function appendSheetRow(range: string, row: Array<string | number>) {
-  if (!SPREADSHEET_ID) return;
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
-  });
-}
-
-async function updateSheetRow(range: string, row: Array<string | number>) {
-  if (!SPREADSHEET_ID) return;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
-  });
-}
-
-function mapRows<T>(
-  rows: string[][],
-  fallbackHeaders: string[],
-  mapper: (row: string[], headers: string[], rowIndex: number) => T
-): T[] {
-  if (!rows.length) return [];
-  const firstRow = rows[0].map(normalizeHeader);
-  const isHeaderRow = firstRow.some((header) => fallbackHeaders.includes(header));
-  const headers = isHeaderRow ? firstRow : fallbackHeaders;
-  const dataRows = isHeaderRow ? rows.slice(1) : rows;
-  const startRow = isHeaderRow ? 2 : 1;
-  return dataRows.map((row, index) => mapper(row, headers, startRow + index));
-}
-
-async function ensureSheetWithHeaders(title: string, headers: string[]) {
-  if (!SPREADSHEET_ID) return;
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_ID,
-    fields: "sheets(properties(title))",
-  });
-  const existingTitles = new Set(
-    (meta.data.sheets || []).map((sheet) => sheet.properties?.title).filter(Boolean)
-  );
-
-  if (!existingTitles.has(title)) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title } } }],
-      },
-    });
-  }
-
-  const firstRow = await readSheetRows(`${title}!1:1`);
-  if (!firstRow.length || firstRow[0].length === 0) {
-    await updateSheetRow(`${title}!1:1`, headers);
-  }
-}
-
-async function ensureAuthSheets() {
-  await ensureSheetWithHeaders(USERS_SHEET, [
-    "userId",
-    "email",
-    "passwordHash",
-    "displayName",
-    "role",
-    "isActive",
-    "createdAt",
-    "updatedAt",
-    "lastLoginAt",
-  ]);
-  await ensureSheetWithHeaders(SESSIONS_SHEET, [
-    "sessionId",
-    "userId",
-    "tokenHash",
-    "expiresAt",
-    "createdAt",
-    "revokedAt",
-    "ip",
-    "userAgent",
-  ]);
-  await ensureSheetWithHeaders(AUDIT_SHEET, [
-    "eventId",
-    "userId",
-    "eventType",
-    "targetId",
-    "metadataJson",
-    "createdAt",
-  ]);
-}
-
-async function getUsers(): Promise<UserRecord[]> {
-  const rows = await readSheetRows(`${USERS_SHEET}!A:I`);
-  const headers = [
-    "userid",
-    "email",
-    "passwordhash",
-    "displayname",
-    "role",
-    "isactive",
-    "createdat",
-    "updatedat",
-    "lastloginat",
-  ];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    return {
-      rowIndex,
-      userId: get("userid"),
-      email: normalizeEmail(get("email")),
-      passwordHash: get("passwordhash"),
-      displayName: get("displayname"),
-      role: get("role") === "admin" ? "admin" : "user",
-      isActive: get("isactive") !== "false",
-      createdAt: get("createdat") || nowIso(),
-      updatedAt: get("updatedat") || nowIso(),
-      lastLoginAt: get("lastloginat"),
-    };
-  }).filter((user) => Boolean(user.userId && user.email));
-}
-
-async function getSessions(): Promise<SessionRecord[]> {
-  const rows = await readSheetRows(`${SESSIONS_SHEET}!A:H`);
-  const headers = [
-    "sessionid",
-    "userid",
-    "tokenhash",
-    "expiresat",
-    "createdat",
-    "revokedat",
-    "ip",
-    "useragent",
-  ];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    return {
-      rowIndex,
-      sessionId: get("sessionid"),
-      userId: get("userid"),
-      tokenHash: get("tokenhash"),
-      expiresAt: get("expiresat"),
-      createdAt: get("createdat"),
-      revokedAt: get("revokedat"),
-      ip: get("ip"),
-      userAgent: get("useragent"),
-    };
-  }).filter((session) => Boolean(session.sessionId && session.tokenHash));
-}
-
-async function logAuditEvent(
-  userId: string,
-  eventType: string,
-  targetId: string,
-  metadata: Record<string, unknown>
-) {
-  await appendSheetRow(`${AUDIT_SHEET}!A:F`, [
-    randomUUID(),
-    userId,
-    eventType,
-    targetId,
-    JSON.stringify(metadata),
-    nowIso(),
-  ]);
-}
-
-async function getWorkoutRecords(): Promise<WorkoutRecord[]> {
-  const rows = await readSheetRows(WORKOUTS_RANGE);
-  const headers = ["username", "date", "musclegroup", "exercises", "setsreps", "notes"];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      musclegroup: get("musclegroup"),
-      exercises: get("exercises"),
-      setsreps: get("setsreps"),
-      notes: get("notes"),
-    };
-  }).filter((entry) => Boolean(entry.date || entry.username));
-}
-
-async function getActivityRecords(workouts: WorkoutRecord[]): Promise<ActivityDailyRecord[]> {
-  const rows = await readSheetRows(ACTIVITY_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "date",
-    "steps",
-    "distancekm",
-    "calories",
-    "activeminutes",
-    "notes",
-  ];
-  const activityRows = mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: get("userid") || makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      steps: safeNumber(get("steps")),
-      distanceKm: safeNumber(get("distancekm")),
-      calories: safeNumber(get("calories")),
-      activeMinutes: safeNumber(get("activeminutes")),
-      notes: get("notes"),
-    };
-  }).filter((entry) => Boolean(entry.date));
-
-  if (activityRows.length) return activityRows;
-
-  const map = new Map<string, ActivityDailyRecord>();
-  workouts.forEach((workout) => {
-    const key = `${workout.userId}:${workout.date}`;
-    const current = map.get(key);
-    if (!current) {
-      map.set(key, {
-        userId: workout.userId,
-        username: workout.username,
-        date: workout.date,
-        steps: 0,
-        distanceKm: 0,
-        calories: 120,
-        activeMinutes: 45,
-        notes: "Derived from workout logs",
-      });
-      return;
-    }
-    current.calories += 80;
-    current.activeMinutes += 20;
-  });
-  return Array.from(map.values());
-}
-
-async function getGoalsRecords(): Promise<GoalsRecord[]> {
-  const rows = await readSheetRows(GOALS_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "period",
-    "stepsgoal",
-    "distancegoalkm",
-    "caloriesgoal",
-    "activeminutesgoal",
-    "updatedat",
-    "isactive",
-  ];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: get("userid") || makeUserId(username),
-      username,
-      period: get("period") === "weekly" ? "weekly" : "daily",
-      stepsGoal: safeNumber(get("stepsgoal")),
-      distanceGoalKm: safeNumber(get("distancegoalkm")),
-      caloriesGoal: safeNumber(get("caloriesgoal")),
-      activeMinutesGoal: safeNumber(get("activeminutesgoal")),
-      updatedAt: get("updatedat") || nowIso(),
-    };
-  });
-}
-
-const toSafeUser = (record: UserRecord): SafeUser => ({
-  userId: record.userId,
-  email: record.email,
-  displayName: record.displayName,
-  role: record.role,
-});
-
-function getAuthToken(req: express.Request) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) return "";
-  return header.slice(7).trim();
-}
-
-function readClientIp(req: express.Request) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.length > 0) {
-    return forwarded.split(",")[0]?.trim() || "";
-  }
-  return req.socket.remoteAddress || "";
-}
-
-async function createSession(userId: string, req: express.Request) {
-  const sessionId = randomUUID();
-  const tokenValue = randomBytes(32).toString("hex");
-  const tokenHash = hashToken(tokenValue);
-  const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-  await appendSheetRow(`${SESSIONS_SHEET}!A:H`, [
-    sessionId,
-    userId,
-    tokenHash,
-    expiresAt,
-    createdAt,
-    "",
-    readClientIp(req),
-    String(req.headers["user-agent"] || ""),
-  ]);
-  return { sessionId, tokenValue, expiresAt };
-}
-
-function applyLoginRateLimit(key: string) {
-  const now = Date.now();
-  const current = loginAttemptMap.get(key);
-  if (!current) return { blocked: false };
-  if (current.blockedUntil > now) {
-    return { blocked: true, retryAfterSec: Math.ceil((current.blockedUntil - now) / 1000) };
-  }
-  if (now - current.firstAt > LOGIN_WINDOW_MS) {
-    loginAttemptMap.delete(key);
-  }
-  return { blocked: false };
-}
-
-function recordLoginFailure(key: string) {
-  const now = Date.now();
-  const current = loginAttemptMap.get(key);
-  if (!current || now - current.firstAt > LOGIN_WINDOW_MS) {
-    loginAttemptMap.set(key, { attempts: 1, firstAt: now, blockedUntil: 0 });
-    return;
-  }
-  current.attempts += 1;
-  if (current.attempts >= MAX_LOGIN_ATTEMPTS) {
-    current.blockedUntil = now + LOGIN_WINDOW_MS;
-  }
-}
-
-function clearLoginFailures(key: string) {
-  loginAttemptMap.delete(key);
-}
-
-const requireAuth: express.RequestHandler = async (req, res, next) => {
-  try {
-    if (!ensureSpreadsheetId(res)) return;
-    const tokenValue = getAuthToken(req);
-    if (!tokenValue) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    const tokenHash = hashToken(tokenValue);
-    const sessions = await getSessions();
-    const session = sessions.find((entry) => entry.tokenHash === tokenHash);
-    if (!session) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    if (session.revokedAt) {
-      res.status(401).json({ error: "Session revoked" });
-      return;
-    }
-    if (new Date(session.expiresAt).getTime() < Date.now()) {
-      res.status(401).json({ error: "Session expired" });
-      return;
-    }
-    const users = await getUsers();
-    const user = users.find((entry) => entry.userId === session.userId && entry.isActive);
-    if (!user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    req.authUser = toSafeUser(user);
-    req.authSessionToken = tokenValue;
-    req.authSessionId = session.sessionId;
-    next();
-  } catch (error) {
-    console.error("Auth middleware error:", error);
-    res.status(500).json({ error: "Failed to verify session" });
-  }
-};
-
-const requireRole =
-  (role: Role): express.RequestHandler =>
-  (req, res, next) => {
-    if (!req.authUser) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    if (req.authUser.role !== role) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
-    next();
-  };
-
-function scopedUserId(req: express.Request, userRaw: string | undefined) {
-  const authUser = req.authUser;
-  if (!authUser) return "all";
-  if (authUser.role !== "admin") return authUser.userId;
-  if (!userRaw || userRaw === "all") return "all";
-  return makeUserId(userRaw);
-}
-
-function scopedUsername(req: express.Request, userRaw: string | undefined) {
-  const authUser = req.authUser;
-  if (!authUser) return "";
-  if (authUser.role !== "admin") return authUser.displayName;
-  if (!userRaw || userRaw === "all") return "all";
-  return userRaw;
-}
-
-// --- Telegram Bot logging ---
-function parseWorkoutManual(text: string, username: string) {
-  const parts = text.split("-").map((value) => value.trim());
-  return {
-    username: normalizeUser(username),
-    date: todayIsoDate(),
-    muscleGroup: parts[0] || "Unknown",
-    exercises: parts[1] || "Not specified",
-    setsReps: parts[2] || "Not specified",
-    notes: parts.slice(3).join(" - ") || "None",
-  };
-}
-
-if (bot) {
-  bot.on("message", async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    const username = msg.from?.username || msg.from?.first_name || "Unknown";
-    if (!text || text.startsWith("/")) {
-      if (text === "/start") {
-        bot?.sendMessage(
-          chatId,
-          'Welcome to FitSheet Bot!\n\nLog using: "Muscle Group - Exercises - Sets/Reps"\nExample: "Chest - Bench Press - 3x10"'
-        );
-      }
-      return;
-    }
-
-    const workout = parseWorkoutManual(text, username);
-    if (!SPREADSHEET_ID) return;
-    try {
-      await appendSheetRow(WORKOUTS_RANGE, [
-        workout.username,
-        workout.date,
-        workout.muscleGroup,
-        workout.exercises,
-        workout.setsReps,
-        workout.notes,
-      ]);
-      bot?.sendMessage(chatId, `Logged ${workout.muscleGroup} workout.`);
-    } catch (error) {
-      console.error("Google Sheets Error:", error);
-      bot?.sendMessage(chatId, "Failed to log workout.");
-    }
-  });
-}
-
-app.use(express.json());
-
-app.post("/api/auth/signup", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const email = normalizeEmail(String(req.body?.email || ""));
-  const password = String(req.body?.password || "");
-  const displayName = normalizeUser(String(req.body?.displayName || ""));
-
-  if (!EMAIL_REGEX.test(email)) {
-    return res.status(400).json({ error: "Valid email is required" });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
-  }
-  if (!displayName) {
-    return res.status(400).json({ error: "displayName is required" });
-  }
-
-  try {
-    const users = await getUsers();
-    if (users.some((user) => user.email === email)) {
-      return res.status(409).json({ error: "Email already exists" });
-    }
-
-    const now = nowIso();
-    const userId = randomUUID();
-    const passwordHash = await bcrypt.hash(password, 10);
-    const role: Role = users.length === 0 ? "admin" : "user";
-    await appendSheetRow(`${USERS_SHEET}!A:I`, [
-      userId,
-      email,
-      passwordHash,
-      displayName,
-      role,
-      "true",
-      now,
-      now,
-      now,
-    ]);
-
-    const session = await createSession(userId, req);
-    await logAuditEvent(userId, "signup", userId, { email, role });
-
-    const user: SafeUser = { userId, email, displayName, role };
-    res.status(201).json({
-      token: session.tokenValue,
-      expiresAt: session.expiresAt,
-      user,
-    });
-  } catch (error) {
-    console.error("Signup error:", error);
-    res.status(500).json({ error: "Failed to sign up user" });
-  }
-});
-
-app.post("/api/auth/login", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const email = normalizeEmail(String(req.body?.email || ""));
-  const password = String(req.body?.password || "");
-  const key = `${email}:${readClientIp(req)}`;
-  const limit = applyLoginRateLimit(key);
-  if (limit.blocked) {
-    return res
-      .status(429)
-      .json({ error: "Too many login attempts. Try again later.", retryAfterSec: limit.retryAfterSec });
-  }
-
-  if (!EMAIL_REGEX.test(email) || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-
-  try {
-    const users = await getUsers();
-    const user = users.find((entry) => entry.email === email && entry.isActive);
-    if (!user) {
-      recordLoginFailure(key);
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    const matches = await bcrypt.compare(password, user.passwordHash);
-    if (!matches) {
-      recordLoginFailure(key);
-      await logAuditEvent(user.userId, "login_failed", user.userId, { email });
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    clearLoginFailures(key);
-    const now = nowIso();
-    await updateSheetRow(`${USERS_SHEET}!A${user.rowIndex}:I${user.rowIndex}`, [
-      user.userId,
-      user.email,
-      user.passwordHash,
-      user.displayName,
-      user.role,
-      user.isActive ? "true" : "false",
-      user.createdAt,
-      now,
-      now,
-    ]);
-    const session = await createSession(user.userId, req);
-    await logAuditEvent(user.userId, "login_success", user.userId, { email });
-    res.json({
-      token: session.tokenValue,
-      expiresAt: session.expiresAt,
-      user: toSafeUser(user),
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Failed to login" });
-  }
-});
-
-app.post("/api/auth/logout", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  if (!req.authSessionId || !req.authUser) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  try {
-    const sessions = await getSessions();
-    const session = sessions.find((entry) => entry.sessionId === req.authSessionId);
-    if (session) {
-      await updateSheetRow(`${SESSIONS_SHEET}!A${session.rowIndex}:H${session.rowIndex}`, [
-        session.sessionId,
-        session.userId,
-        session.tokenHash,
-        session.expiresAt,
-        session.createdAt,
-        nowIso(),
-        session.ip,
-        session.userAgent,
-      ]);
-    }
-    await logAuditEvent(req.authUser.userId, "logout", req.authUser.userId, {});
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Logout error:", error);
-    res.status(500).json({ error: "Failed to logout" });
-  }
-});
-
-app.get("/api/auth/me", requireAuth, async (req, res) => {
-  if (!req.authUser) return res.status(401).json({ error: "Unauthorized" });
-  res.json({ user: req.authUser });
-});
-
-app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const users = await getUsers();
-    res.json(
-      users.map((entry) => ({
-        userId: entry.userId,
-        email: entry.email,
-        displayName: entry.displayName,
-        role: entry.role,
-        isActive: entry.isActive,
-      }))
-    );
-  } catch (error) {
-    console.error("Fetch users error:", error);
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
-});
-
-app.get("/api/workouts", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  try {
-    const workouts = await getWorkoutRecords();
-    const userRaw = typeof req.query.user === "string" ? req.query.user : "all";
-    const scopedId = scopedUserId(req, userRaw);
-    const scopedName = scopedUsername(req, userRaw);
-    const filtered = workouts.filter((entry) => {
-      if (scopedId === "all") return true;
-      return entry.userId === scopedId || entry.username === scopedName;
-    });
-    res.json(filtered);
-  } catch (error) {
-    console.error("Fetch Workouts Error:", error);
-    res.status(500).json({ error: "Failed to fetch workouts" });
-  }
-});
-
-app.get("/api/activity/daily", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = typeof req.query.user === "string" ? req.query.user : "all";
-  const rangeResult = parseDateRange(
-    typeof req.query.from === "string" ? req.query.from : undefined,
-    typeof req.query.to === "string" ? req.query.to : undefined
-  );
-  if ("error" in rangeResult) {
-    return res.status(400).json({ error: rangeResult.error });
-  }
-  try {
-    const workouts = await getWorkoutRecords();
-    const activity = await getActivityRecords(workouts);
-    const scopedId = scopedUserId(req, userRaw);
-    const scopedName = scopedUsername(req, userRaw);
-    const filtered = activity.filter((entry) => {
-      const inRange = entry.date >= rangeResult.from && entry.date <= rangeResult.to;
-      if (scopedId === "all") return inRange;
-      return inRange && (entry.userId === scopedId || entry.username === scopedName);
-    });
-    res.json(filtered);
-  } catch (error) {
-    console.error("Fetch Activity Error:", error);
-    res.status(500).json({ error: "Failed to fetch activity data" });
-  }
-});
-
-app.get("/api/goals", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = typeof req.query.user === "string" ? req.query.user : "all";
-  try {
-    const goals = await getGoalsRecords();
-    const scopedId = scopedUserId(req, userRaw);
-    const scopedName = scopedUsername(req, userRaw);
-    const filtered =
-      scopedId === "all"
-        ? goals
-        : goals.filter((goal) => goal.userId === scopedId || goal.username === scopedName);
-
-    if (filtered.length) return res.json(filtered);
-    if (!req.authUser) return res.json([]);
-
-    const fallbackName = scopedName === "all" ? req.authUser.displayName : scopedName;
-    const fallbackId = scopedId === "all" ? req.authUser.userId : scopedId;
-    res.json([
-      {
-        userId: fallbackId,
-        username: fallbackName,
-        period: "daily",
-        stepsGoal: 8000,
-        distanceGoalKm: 5,
-        caloriesGoal: 450,
-        activeMinutesGoal: 45,
-        updatedAt: nowIso(),
-      } satisfies GoalsRecord,
-    ]);
-  } catch (error) {
-    console.error("Fetch Goals Error:", error);
-    res.status(500).json({ error: "Failed to fetch goals data" });
-  }
-});
-
-app.post("/api/goals", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  if (!req.authUser) return res.status(401).json({ error: "Unauthorized" });
-  const { user, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal } = req.body || {};
-  if (period !== "daily" && period !== "weekly") {
-    return res.status(400).json({ error: "period must be daily or weekly" });
-  }
-  const parsedGoals = [
-    safeNumber(String(stepsGoal ?? "")),
-    safeNumber(String(distanceGoalKm ?? "")),
-    safeNumber(String(caloriesGoal ?? "")),
-    safeNumber(String(activeMinutesGoal ?? "")),
-  ];
-  if (parsedGoals.some((value) => value < 0)) {
-    return res.status(400).json({ error: "goal values must be >= 0" });
-  }
-
-  try {
-    let targetUserId = req.authUser.userId;
-    let targetUsername = req.authUser.displayName;
-    if (req.authUser.role === "admin" && typeof user === "string" && user.trim()) {
-      targetUsername = user.trim();
-      targetUserId = makeUserId(targetUsername);
-    }
-    const updatedAt = nowIso();
-    await appendSheetRow(GOALS_RANGE, [
-      targetUserId,
-      targetUsername,
-      period,
-      parsedGoals[0],
-      parsedGoals[1],
-      parsedGoals[2],
-      parsedGoals[3],
-      updatedAt,
-      "true",
-    ]);
-    await logAuditEvent(req.authUser.userId, "goal_update", targetUserId, {
-      period,
-      stepsGoal: parsedGoals[0],
-      distanceGoalKm: parsedGoals[1],
-      caloriesGoal: parsedGoals[2],
-      activeMinutesGoal: parsedGoals[3],
-    });
-    const payload: GoalsRecord = {
-      userId: targetUserId,
-      username: targetUsername,
-      period,
-      stepsGoal: parsedGoals[0],
-      distanceGoalKm: parsedGoals[1],
-      caloriesGoal: parsedGoals[2],
-      activeMinutesGoal: parsedGoals[3],
-      updatedAt,
-    };
-    res.status(201).json(payload);
-  } catch (error) {
-    console.error("Save Goals Error:", error);
-    res.status(500).json({ error: "Failed to save goals data" });
-  }
-});
-
-app.get("/api/streaks", requireAuth, async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = typeof req.query.user === "string" ? req.query.user : "all";
-  try {
-    const scopedId = scopedUserId(req, userRaw);
-    const scopedName = scopedUsername(req, userRaw);
-    if (scopedId === "all") {
-      return res.status(400).json({ error: "user query is required when requesting streaks as admin" });
-    }
-    const workouts = await getWorkoutRecords();
-    const activity = (await getActivityRecords(workouts)).filter(
-      (entry) => entry.userId === scopedId || entry.username === scopedName
-    );
-    const goalsForUser = (await getGoalsRecords()).filter(
-      (goal) => goal.userId === scopedId || goal.username === scopedName
-    );
-    const activeGoal =
-      goalsForUser.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-      ({
-        userId: scopedId,
-        username: scopedName === "all" ? req.authUser?.displayName || "" : scopedName,
-        period: "daily",
-        stepsGoal: 8000,
-        distanceGoalKm: 5,
-        caloriesGoal: 450,
-        activeMinutesGoal: 45,
-        updatedAt: nowIso(),
-      } satisfies GoalsRecord);
-
-    const byDate = new Map<string, ActivityDailyRecord>();
-    activity.forEach((entry) => {
-      const existing = byDate.get(entry.date);
-      if (!existing) {
-        byDate.set(entry.date, { ...entry });
-        return;
-      }
-      existing.steps += entry.steps;
-      existing.distanceKm += entry.distanceKm;
-      existing.calories += entry.calories;
-      existing.activeMinutes += entry.activeMinutes;
-    });
-
-    const dates = Array.from(byDate.keys()).sort();
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let running = 0;
-
-    dates.forEach((date) => {
-      const record = byDate.get(date);
-      if (!record) return;
-      if (isGoalMet(record, activeGoal)) {
-        running += 1;
-        longestStreak = Math.max(longestStreak, running);
-      } else {
-        running = 0;
-      }
-    });
-
-    let probeDate = new Date();
-    for (let i = 0; i < 365; i += 1) {
-      const key = probeDate.toISOString().slice(0, 10);
-      const dayData = byDate.get(key);
-      if (dayData && isGoalMet(dayData, activeGoal)) {
-        currentStreak += 1;
-      } else {
-        break;
-      }
-      probeDate.setUTCDate(probeDate.getUTCDate() - 1);
-    }
-
-    const todayData = byDate.get(todayIsoDate());
-    const todayGoalMet = Boolean(todayData && isGoalMet(todayData, activeGoal));
-    const atRisk = !todayGoalMet;
-    const dailyStatus = Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-30)
-      .map(([date, record]) => ({ date, met: isGoalMet(record, activeGoal) }));
-
-    res.json({
-      user: activeGoal.username,
-      goal: activeGoal,
-      currentStreak,
-      longestStreak,
-      atRisk,
-      todayGoalMet,
-      dailyStatus,
-    });
-  } catch (error) {
-    console.error("Fetch Streaks Error:", error);
-    res.status(500).json({ error: "Failed to fetch streaks data" });
-  }
-});
-
-async function startServer() {
-  if (SPREADSHEET_ID) {
-    try {
-      await ensureAuthSheets();
-      console.log("Auth sheets verified.");
-    } catch (error) {
-      console.error("Failed to verify auth sheets:", error);
-    }
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-startServer();
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import TelegramBot from "node-telegram-bot-api";
-import { google } from "googleapis";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const app = express();
-const PORT = 3030;
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const WORKOUTS_RANGE = "Sheet1!A:F";
-const ACTIVITY_RANGE = "Activity!A:H";
-const GOALS_RANGE = "Goals!A:I";
-
-interface WorkoutRecord {
-  userId: string;
-  username: string;
-  date: string;
-  musclegroup: string;
-  exercises: string;
-  setsreps: string;
-  notes: string;
-}
-
-interface ActivityDailyRecord {
-  userId: string;
-  username: string;
-  date: string;
-  steps: number;
-  distanceKm: number;
-  calories: number;
-  activeMinutes: number;
-  notes: string;
-}
-
-interface GoalsRecord {
-  userId: string;
-  username: string;
-  period: "daily" | "weekly";
-  stepsGoal: number;
-  distanceGoalKm: number;
-  caloriesGoal: number;
-  activeMinutesGoal: number;
-  updatedAt: string;
-}
-
-// --- Telegram Bot Setup ---
-const token = process.env.TELEGRAM_BOT_TOKEN;
-let bot: TelegramBot | null = null;
-
-if (token) {
-  bot = new TelegramBot(token, { polling: true });
-  console.log("Telegram bot initialized (polling mode)");
-} else {
-  console.warn("TELEGRAM_BOT_TOKEN not found. Bot functionality disabled.");
-}
-
-// --- Google Sheets Setup ---
-const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
-
-const sheets = google.sheets({
-  version: "v4",
-  auth,
-});
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
-
-const normalizeHeader = (value: string) =>
-  value.toLowerCase().replace(/\s/g, "").replace(/_/g, "");
-
-const safeNumber = (value: string | undefined) => {
-  const parsed = Number(value ?? "");
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const toIsoDate = (value?: string) => {
-  if (!value) return "";
-  if (DATE_REGEX.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toISOString().slice(0, 10);
-};
-
-const todayIsoDate = () => new Date().toISOString().slice(0, 10);
-
-const parseDateRange = (
-  fromRaw: string | undefined,
-  toRaw: string | undefined
-): { from: string; to: string } | { error: string } => {
-  const from = toIsoDate(fromRaw) || "1970-01-01";
-  const to = toIsoDate(toRaw) || todayIsoDate();
-  if (from > to) {
-    return { error: "Invalid range: from must be <= to" };
-  }
-  return { from, to };
-};
-
-const normalizeUser = (value: string) => value.trim();
-const makeUserId = (username: string) =>
-  normalizeUser(username || "unknown")
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-
-const metricKeys = ["steps", "distancekm", "calories", "activeminutes"] as const;
-
-const isGoalMet = (activity: ActivityDailyRecord, goal: GoalsRecord) => {
-  const checks = [
-    goal.stepsGoal > 0 ? activity.steps >= goal.stepsGoal : true,
-    goal.distanceGoalKm > 0 ? activity.distanceKm >= goal.distanceGoalKm : true,
-    goal.caloriesGoal > 0 ? activity.calories >= goal.caloriesGoal : true,
-    goal.activeMinutesGoal > 0 ? activity.activeMinutes >= goal.activeMinutesGoal : true,
-  ];
-  return checks.every(Boolean);
-};
-
-const ensureSpreadsheetId = (res: express.Response) => {
-  if (!SPREADSHEET_ID) {
-    res.status(500).json({ error: "GOOGLE_SHEET_ID not configured" });
-    return false;
-  }
-  return true;
-};
-
-async function readSheetRows(range: string) {
-  if (!SPREADSHEET_ID) return [];
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-  });
-  return response.data.values || [];
-}
-
-async function appendSheetRow(range: string, row: Array<string | number>) {
-  if (!SPREADSHEET_ID) return;
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
-  });
-}
-
-function mapRows<T>(
-  rows: string[][],
-  fallbackHeaders: string[],
-  mapper: (row: string[], headers: string[]) => T
-): T[] {
-  if (!rows.length) return [];
-  const firstRow = rows[0].map(normalizeHeader);
-  const isHeaderRow = firstRow.some((header) => fallbackHeaders.includes(header));
-  const headers = isHeaderRow ? firstRow : fallbackHeaders;
-  const dataRows = isHeaderRow ? rows.slice(1) : rows;
-  return dataRows.map((row) => mapper(row, headers));
-}
-
-async function getWorkoutRecords(): Promise<WorkoutRecord[]> {
-  const rows = await readSheetRows(WORKOUTS_RANGE);
-  const headers = ["username", "date", "musclegroup", "exercises", "setsreps", "notes"];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      musclegroup: get("musclegroup"),
-      exercises: get("exercises"),
-      setsreps: get("setsreps"),
-      notes: get("notes"),
-    };
-  }).filter((entry) => Boolean(entry.date || entry.username));
-}
-
-async function getActivityRecords(workouts: WorkoutRecord[]): Promise<ActivityDailyRecord[]> {
-  const rows = await readSheetRows(ACTIVITY_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "date",
-    "steps",
-    "distancekm",
-    "calories",
-    "activeminutes",
-    "notes",
-  ];
-  const activityRows = mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: get("userid") || makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      steps: safeNumber(get("steps")),
-      distanceKm: safeNumber(get("distancekm")),
-      calories: safeNumber(get("calories")),
-      activeMinutes: safeNumber(get("activeminutes")),
-      notes: get("notes"),
-    };
-  }).filter((entry) => Boolean(entry.date));
-
-  if (activityRows.length) return activityRows;
-
-  // Fallback for MVP: derive a minimal daily activity snapshot from workouts only.
-  const map = new Map<string, ActivityDailyRecord>();
-  workouts.forEach((workout) => {
-    const key = `${workout.userId}:${workout.date}`;
-    const current = map.get(key);
-    if (!current) {
-      map.set(key, {
-        userId: workout.userId,
-        username: workout.username,
-        date: workout.date,
-        steps: 0,
-        distanceKm: 0,
-        calories: 120,
-        activeMinutes: 45,
-        notes: "Derived from workout logs",
-      });
-      return;
-    }
-    current.calories += 80;
-    current.activeMinutes += 20;
-  });
-  return Array.from(map.values());
-}
-
-async function getGoalsRecords(): Promise<GoalsRecord[]> {
-  const rows = await readSheetRows(GOALS_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "period",
-    "stepsgoal",
-    "distancegoalkm",
-    "caloriesgoal",
-    "activeminutesgoal",
-    "updatedat",
-    "isactive",
-  ];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: get("userid") || makeUserId(username),
-      username,
-      period: get("period") === "weekly" ? "weekly" : "daily",
-      stepsGoal: safeNumber(get("stepsgoal")),
-      distanceGoalKm: safeNumber(get("distancegoalkm")),
-      caloriesGoal: safeNumber(get("caloriesgoal")),
-      activeMinutesGoal: safeNumber(get("activeminutesgoal")),
-      updatedAt: get("updatedat") || new Date().toISOString(),
-    };
-  });
-}
-
-// --- Helper: Manual Workout Parser (Non-AI) ---
-function parseWorkoutManual(text: string, username: string) {
-  // Expected format: "Muscle Group - Exercises - Sets/Reps"
-  // Example: "Chest - Bench Press - 3x10"
-  const parts = text.split("-").map(p => p.trim());
-  
-  return {
-    username: normalizeUser(username),
-    date: new Date().toISOString().split("T")[0],
-    muscleGroup: parts[0] || "Unknown",
-    exercises: parts[1] || "Not specified",
-    setsReps: parts[2] || "Not specified",
-    notes: parts.slice(3).join(" - ") || "None"
-  };
-}
-
-// --- Bot Message Handler ---
-if (bot) {
-  bot.on("message", async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    const username = msg.from?.username || msg.from?.first_name || "Unknown";
-
-    if (!text || text.startsWith("/")) {
-      if (text === "/start") {
-        bot.sendMessage(chatId, "💪 Welcome to FitSheet Bot!\n\nLog your workout using this format:\n`Muscle Group - Exercises - Sets/Reps`\n\nExample:\n`Chest - Bench Press - 3x10`", { parse_mode: "Markdown" });
-      }
-      return;
-    }
-
-    bot.sendMessage(chatId, "📝 Logging your workout...");
-
-    const workout = parseWorkoutManual(text, username);
-
-    if (SPREADSHEET_ID) {
-      try {
-        await appendSheetRow(WORKOUTS_RANGE, [
-          workout.username,
-          workout.date,
-          workout.muscleGroup,
-          workout.exercises,
-          workout.setsReps,
-          workout.notes,
-        ]);
-        bot.sendMessage(chatId, `✅ Logged! ${workout.muscleGroup} workout added to your sheet.`);
-      } catch (error) {
-        console.error("Google Sheets Error:", error);
-        bot.sendMessage(chatId, "❌ Failed to save to Google Sheets. Check server logs.");
-      }
-    }
-  });
-}
-
-// --- API Routes ---
-app.use(express.json());
-
-app.get("/api/workouts", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-
-  try {
-    const workouts = await getWorkoutRecords();
-    res.json(workouts);
-  } catch (error) {
-    console.error("Fetch Workouts Error:", error);
-    res.status(500).json({ error: "Failed to fetch from Google Sheets" });
-  }
-});
-
-app.get("/api/activity/daily", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = String(req.query.user || "all");
-  const rangeResult = parseDateRange(
-    typeof req.query.from === "string" ? req.query.from : undefined,
-    typeof req.query.to === "string" ? req.query.to : undefined
-  );
-  if ("error" in rangeResult) {
-    return res.status(400).json({ error: rangeResult.error });
-  }
-  try {
-    const workouts = await getWorkoutRecords();
-    const activity = await getActivityRecords(workouts);
-    const requestedUserId = userRaw === "all" ? "all" : makeUserId(userRaw);
-    const filtered = activity.filter((entry) => {
-      const inDateRange = entry.date >= rangeResult.from && entry.date <= rangeResult.to;
-      const userMatch = requestedUserId === "all" || entry.userId === requestedUserId || entry.username === userRaw;
-      return inDateRange && userMatch;
-    });
-    res.json(filtered);
-  } catch (error) {
-    console.error("Fetch Activity Error:", error);
-    res.status(500).json({ error: "Failed to fetch activity data" });
-  }
-});
-
-app.get("/api/goals", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = String(req.query.user || "all");
-  try {
-    const goals = await getGoalsRecords();
-    if (userRaw === "all") return res.json(goals);
-    const userId = makeUserId(userRaw);
-    const userGoals = goals.filter(
-      (goal) => goal.userId === userId || goal.username === userRaw
-    );
-    if (userGoals.length) return res.json(userGoals);
-    return res.json([
-      {
-        userId,
-        username: userRaw,
-        period: "daily",
-        stepsGoal: 8000,
-        distanceGoalKm: 5,
-        caloriesGoal: 450,
-        activeMinutesGoal: 45,
-        updatedAt: new Date().toISOString(),
-      } satisfies GoalsRecord,
-    ]);
-  } catch (error) {
-    console.error("Fetch Goals Error:", error);
-    res.status(500).json({ error: "Failed to fetch goals data" });
-  }
-});
-
-app.post("/api/goals", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const {
-    user,
-    period,
-    stepsGoal,
-    distanceGoalKm,
-    caloriesGoal,
-    activeMinutesGoal,
-  } = req.body || {};
-
-  if (typeof user !== "string" || !user.trim()) {
-    return res.status(400).json({ error: "user is required" });
-  }
-  if (period !== "daily" && period !== "weekly") {
-    return res.status(400).json({ error: "period must be daily or weekly" });
-  }
-  const parsedGoals = [
-    safeNumber(String(stepsGoal ?? "")),
-    safeNumber(String(distanceGoalKm ?? "")),
-    safeNumber(String(caloriesGoal ?? "")),
-    safeNumber(String(activeMinutesGoal ?? "")),
-  ];
-  if (parsedGoals.some((goal) => goal < 0)) {
-    return res.status(400).json({ error: "goal values must be >= 0" });
-  }
-
-  try {
-    const username = normalizeUser(user);
-    const userId = makeUserId(username);
-    const updatedAt = new Date().toISOString();
-    await appendSheetRow(GOALS_RANGE, [
-      userId,
-      username,
-      period,
-      parsedGoals[0],
-      parsedGoals[1],
-      parsedGoals[2],
-      parsedGoals[3],
-      updatedAt,
-      "true",
-    ]);
-    const response: GoalsRecord = {
-      userId,
-      username,
-      period,
-      stepsGoal: parsedGoals[0],
-      distanceGoalKm: parsedGoals[1],
-      caloriesGoal: parsedGoals[2],
-      activeMinutesGoal: parsedGoals[3],
-      updatedAt,
-    };
-    res.status(201).json(response);
-  } catch (error) {
-    console.error("Save Goals Error:", error);
-    res.status(500).json({ error: "Failed to save goals data" });
-  }
-});
-
-app.get("/api/streaks", async (req, res) => {
-  if (!ensureSpreadsheetId(res)) return;
-  const userRaw = String(req.query.user || "");
-  if (!userRaw) {
-    return res.status(400).json({ error: "user query is required" });
-  }
-
-  try {
-    const userId = makeUserId(userRaw);
-    const workouts = await getWorkoutRecords();
-    const activity = (await getActivityRecords(workouts)).filter(
-      (entry) => entry.userId === userId || entry.username === userRaw
-    );
-    const goalsForUser = (await getGoalsRecords()).filter(
-      (goal) => goal.userId === userId || goal.username === userRaw
-    );
-
-    const activeGoal =
-      goalsForUser.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ||
-      ({
-        userId,
-        username: userRaw,
-        period: "daily",
-        stepsGoal: 8000,
-        distanceGoalKm: 5,
-        caloriesGoal: 450,
-        activeMinutesGoal: 45,
-        updatedAt: new Date().toISOString(),
-      } satisfies GoalsRecord);
-
-    const byDate = new Map<string, ActivityDailyRecord>();
-    activity.forEach((entry) => {
-      const existing = byDate.get(entry.date);
-      if (!existing) {
-        byDate.set(entry.date, { ...entry });
-        return;
-      }
-      existing.steps += entry.steps;
-      existing.distanceKm += entry.distanceKm;
-      existing.calories += entry.calories;
-      existing.activeMinutes += entry.activeMinutes;
-    });
-
-    const dates = Array.from(byDate.keys()).sort();
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let running = 0;
-
-    dates.forEach((date) => {
-      const current = byDate.get(date);
-      if (!current) return;
-      if (isGoalMet(current, activeGoal)) {
-        running += 1;
-        longestStreak = Math.max(longestStreak, running);
-      } else {
-        running = 0;
-      }
-    });
-
-    let probeDate = new Date();
-    for (let i = 0; i < 365; i += 1) {
-      const key = probeDate.toISOString().slice(0, 10);
-      const dayData = byDate.get(key);
-      if (dayData && isGoalMet(dayData, activeGoal)) {
-        currentStreak += 1;
-      } else {
-        break;
-      }
-      probeDate.setUTCDate(probeDate.getUTCDate() - 1);
-    }
-
-    const todayKey = todayIsoDate();
-    const todayData = byDate.get(todayKey);
-    const todayGoalMet = Boolean(todayData && isGoalMet(todayData, activeGoal));
-    const atRisk = !todayGoalMet;
-    const dailyStatus = Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-30)
-      .map(([date, record]) => ({
-        date,
-        met: isGoalMet(record, activeGoal),
-      }));
-
-    res.json({
-      user: userRaw,
-      goal: activeGoal,
-      currentStreak,
-      longestStreak,
-      atRisk,
-      todayGoalMet,
-      dailyStatus,
-    });
-  } catch (error) {
-    console.error("Fetch Streaks Error:", error);
-    res.status(500).json({ error: "Failed to fetch streaks data" });
-  }
-});
-
-// --- Vite Integration ---
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-startServer();
-*/

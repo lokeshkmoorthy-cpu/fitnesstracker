@@ -7,6 +7,7 @@ import { DashboardHero } from "@/src/components/DashboardHero";
 import { GoalProgressCard } from "@/src/components/GoalProgressCard";
 import { HelpModal } from "@/src/components/HelpModal";
 import { StatCard } from "@/src/components/StatCard";
+import { AttendanceHeatmap } from "@/src/components/AttendanceHeatmap";
 import { WorkoutChart } from "@/src/components/WorkoutChart";
 import { WorkoutTable } from "@/src/components/WorkoutTable";
 import { ActivitySection } from "@/src/features/activity/ActivitySection";
@@ -22,6 +23,7 @@ import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/sr
 import { fitnessApi, setAuthToken } from "@/src/services/api";
 import type {
   ActivityDailyRecord,
+  AttendanceRecord,
   AuthUser,
   DashboardFilters,
   GoalsRecord,
@@ -31,12 +33,43 @@ import type {
 
 const AUTH_TOKEN_KEY = "fitsheet_auth_token";
 
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysIso(iso: string, delta: number): string {
+  const d = new Date(`${iso}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/** When start date is blank, use 31 days ending at end (or today). Otherwise use the filter range. */
+function resolveDashboardApiRange(startDate: string, endDate: string): { from: string; to: string } {
+  const end = endDate.trim() || todayIsoDate();
+  const start = startDate.trim();
+  if (start) {
+    return { from: start, to: endDate.trim() || end };
+  }
+  return { from: addDaysIso(end, -30), to: end };
+}
+
+/** When start date is blank, use a rolling year (365 days) ending at end. Otherwise use the filter range. */
+function resolveAttendanceApiRange(startDate: string, endDate: string): { from: string; to: string } {
+  const end = endDate.trim() || todayIsoDate();
+  const start = startDate.trim();
+  if (start) {
+    return { from: start, to: endDate.trim() || end };
+  }
+  return { from: addDaysIso(end, -364), to: end };
+}
+
 export default function AppMain() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [activity, setActivity] = useState<ActivityDailyRecord[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [goals, setGoals] = useState<GoalsRecord[]>([]);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [streaks, setStreaks] = useState<StreaksResponse | null>(null);
@@ -45,6 +78,7 @@ export default function AppMain() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [attendanceRefreshing, setAttendanceRefreshing] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [savingGoals, setSavingGoals] = useState(false);
   const [activeFooterModal, setActiveFooterModal] = useState<FooterModalKey | null>(null);
@@ -71,6 +105,16 @@ export default function AppMain() {
     [goals, selectedGoalId]
   );
   const canSelectUser = authUser?.role === "admin";
+
+  const dashboardApiRange = useMemo(
+    () => resolveDashboardApiRange(filters.startDate, filters.endDate),
+    [filters.startDate, filters.endDate]
+  );
+
+  const attendanceApiRange = useMemo(
+    () => resolveAttendanceApiRange(filters.startDate, filters.endDate),
+    [filters.startDate, filters.endDate]
+  );
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -111,6 +155,26 @@ export default function AppMain() {
     }
   };
 
+  const refetchAttendance = async () => {
+    if (!authUser) return;
+    const userParam = authUser.role === "admin" ? filters.user : authUser.displayName;
+    const { from: rangeFrom, to: rangeTo } = attendanceApiRange;
+    setAttendanceRefreshing(true);
+    try {
+      const attendanceData = await fitnessApi.getAttendance({
+        user: userParam,
+        from: rangeFrom,
+        to: rangeTo,
+      });
+      setAttendance(Array.isArray(attendanceData) ? attendanceData : []);
+    } catch (attErr) {
+      console.error("Failed to fetch attendance:", attErr);
+      setAttendance([]);
+    } finally {
+      setAttendanceRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     if (!authUser) return;
     fetchWorkouts();
@@ -122,13 +186,28 @@ export default function AppMain() {
     let cancelled = false;
     const load = async () => {
       const userParam = authUser.role === "admin" ? filters.user : authUser.displayName;
+      const { from: rangeFrom, to: rangeTo } = dashboardApiRange;
+      const { from: attFrom, to: attTo } = attendanceApiRange;
       try {
         const [dailyActivity, goalsData] = await Promise.all([
-          fitnessApi.getDailyActivity({ user: userParam, from: filters.startDate, to: filters.endDate }),
+          fitnessApi.getDailyActivity({ user: userParam, from: rangeFrom, to: rangeTo }),
           fitnessApi.getGoals(userParam),
         ]);
         if (cancelled) return;
         setActivity(Array.isArray(dailyActivity) ? dailyActivity.sort((a, b) => a.date.localeCompare(b.date)) : []);
+        try {
+          const attendanceData = await fitnessApi.getAttendance({
+            user: userParam,
+            from: attFrom,
+            to: attTo,
+          });
+          if (!cancelled) {
+            setAttendance(Array.isArray(attendanceData) ? attendanceData : []);
+          }
+        } catch (attErr) {
+          console.error("Failed to fetch attendance:", attErr);
+          if (!cancelled) setAttendance([]);
+        }
         if (userParam !== "all") {
           const sorted = [...goalsData].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
           setGoals(sorted);
@@ -161,7 +240,7 @@ export default function AppMain() {
     };
     load();
     return () => { cancelled = true; };
-  }, [authUser, filters.user, filters.startDate, filters.endDate, workoutFilterOptions.users]);
+  }, [authUser, filters.user, dashboardApiRange, attendanceApiRange, workoutFilterOptions.users]);
 
   const handleLogin = async (payload: { email: string; password: string }) => {
     setAuthSubmitting(true);
@@ -287,10 +366,10 @@ export default function AppMain() {
         <TopBar
           title={
             activeTab === "dashboard" ? "Dashboard" :
-            activeTab === "activity" ? "Activity" :
-            activeTab === "maps" ? "Maps" :
-            activeTab === "schedule" ? "Schedule" :
-            activeTab === "goals" ? "Goals" : "Dashboard"
+              activeTab === "activity" ? "Activity" :
+                activeTab === "maps" ? "Maps" :
+                  activeTab === "schedule" ? "Schedule" :
+                    activeTab === "goals" ? "Goals" : "Dashboard"
           }
           onRefresh={fetchWorkouts}
           refreshing={refreshing}
@@ -298,12 +377,9 @@ export default function AppMain() {
 
         {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
         {activeTab === "dashboard" && (
-          <div
-            className="flex-1 grid gap-3"
-            style={{ gridTemplateColumns: "1fr 260px", gridTemplateRows: "auto auto auto" }}
-          >
-            {/* Row 1 Left — greeting + 3 stat cards */}
-            <div className="flex flex-col gap-2">
+          <div className="flex-1 flex gap-3 min-h-0">
+            {/* Left: stack tightly — avoids grid row-span stretching the hero/stats row above the chart */}
+            <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
               <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
               <div className="grid grid-cols-3 gap-2">
                 <StatCard label="Total Exercises" value={filteredWorkouts.length}
@@ -313,36 +389,53 @@ export default function AppMain() {
                 <StatCard label="Workout Days" value={new Set(filteredWorkouts.map((w) => w.date)).size}
                   icon={<Zap className="w-5 h-5" />} trend="+2" subtitle="Consistency" />
               </div>
+
+              <div className="rounded-xl border border-neutral-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 px-3 py-2 shrink-0 min-h-0">
+                <AttendanceHeatmap
+                  records={attendance}
+                  rangeStart={attendanceApiRange.from}
+                  rangeEnd={attendanceApiRange.to}
+                  userFilter={
+                    canSelectUser
+                      ? {
+                        value: filters.user,
+                        options: workoutFilterOptions.users,
+                        onChange: (user) =>
+                          setFilters((p) => ({ ...p, user })),
+                      }
+                      : undefined
+                  }
+                  viewerLabel={
+                    canSelectUser
+                      ? undefined
+                      : `Your attendance · ${authUser.displayName}`
+                  }
+                  onRefresh={refetchAttendance}
+                  refreshing={attendanceRefreshing}
+                />
+              </div>
+
+              <div className="h-[240px] shrink-0 min-h-0">
+                <WorkoutChart data={chartData} />
+              </div>
+              <div className="flex-1 min-h-0 flex flex-col">
+                <WorkoutTable
+                  workouts={filteredWorkouts}
+                  searchQuery={filters.search}
+                  onSearchChange={(search) => setFilters((p) => ({ ...p, search }))}
+                  filterValue={filters.muscleGroup}
+                  onFilterChange={(muscleGroup) => setFilters((p) => ({ ...p, muscleGroup }))}
+                />
+              </div>
             </div>
 
-            {/* Row 1+2 Right — Goal card spans 2 rows */}
-            <div className="row-span-2">
+            <div className="w-[260px] shrink-0 flex flex-col gap-3">
               <GoalProgressCard
                 current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
                 total={selectedGoal?.stepsGoal || 10000}
                 label=" Steps"
                 onSetGoalClick={scrollToGoals}
               />
-            </div>
-
-            {/* Row 2 Left — Workout chart */}
-            <div>
-              <WorkoutChart data={chartData} />
-            </div>
-
-            {/* Row 3 Left — Exercise table */}
-            <div>
-              <WorkoutTable
-                workouts={filteredWorkouts}
-                searchQuery={filters.search}
-                onSearchChange={(search) => setFilters((p) => ({ ...p, search }))}
-                filterValue={filters.muscleGroup}
-                onFilterChange={(muscleGroup) => setFilters((p) => ({ ...p, muscleGroup }))}
-              />
-            </div>
-
-            {/* Row 3 Right — Activity trend */}
-            <div>
               <ActivityTrendChart data={activity} />
             </div>
           </div>
@@ -394,6 +487,7 @@ export default function AppMain() {
               />
             </div>
             <GoalProgressCard
+              fillHeight
               current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
               total={selectedGoal?.stepsGoal || 10000}
               label=" Steps"

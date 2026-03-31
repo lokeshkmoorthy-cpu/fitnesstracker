@@ -8,6 +8,15 @@ export interface Workout {
   notes: string;
 }
 
+export interface AttendanceRecord {
+  name: string;
+  date: string;
+  time: string;
+  day: string;
+  userId: string;
+  chatId: string;
+}
+
 export interface ActivityDailyRecord {
   userId: string;
   username: string;

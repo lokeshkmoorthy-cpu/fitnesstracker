@@ -1,5 +1,6 @@
 import type {
   ActivityDailyRecord,
+  AttendanceRecord,
   AuthResponse,
   AuthUser,
   GoalsRecord,
@@ -84,6 +85,13 @@ export const fitnessApi = {
     if (params.from) query.set("from", params.from);
     if (params.to) query.set("to", params.to);
     return fetchJson<ActivityDailyRecord[]>(`/api/activity/daily?${query.toString()}`);
+  },
+  getAttendance: (params: { user?: string; from?: string; to?: string }) => {
+    const query = new URLSearchParams();
+    if (params.user) query.set("user", params.user);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    return fetchJson<AttendanceRecord[]>(`/api/attendance?${query.toString()}`);
   },
   getGoals: (user: string) => fetchJson<GoalsRecord[]>(`/api/goals?user=${encodeURIComponent(user)}`),
   createGoal: (payload: GoalPayload) =>

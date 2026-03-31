@@ -9,7 +9,7 @@
   --color-text-main: #111827;
   --color-text-muted: #6b7280;
   --color-border-subtle: #f3f4f6;
-  
+
   color-scheme: light;
 }
 
@@ -21,7 +21,7 @@
   --color-text-main: #f9fafb;
   --color-text-muted: #9ca3af;
   --color-border-subtle: #1f2937;
-  
+
   color-scheme: dark;
 }
 
@@ -79,5 +79,3 @@ body {
   filter: blur(40px);
   pointer-events: none;
 }
-
-
