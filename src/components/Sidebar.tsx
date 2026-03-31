@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
           isCollapsed ? "px-2 py-8 items-center" : "p-8"
         )}>
           {/* Logo Section */}
-          <div className={cn("flex flex-col items-center w-full mb-10", isCollapsed ? "gap-6" : "gap-4")}>
+          <div className={cn("flex flex-col items-center w-full mb-6", isCollapsed ? "gap-6" : "gap-4")}>
             <div className={cn("flex items-center w-full", isCollapsed ? "justify-center" : "justify-between")}>
               <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-purple-500/20 dark:shadow-purple-900/40 shrink-0">
@@ -144,13 +144,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             )}
           </div>
 
-          <nav className="flex-1 space-y-8 w-full">
+          {/* User Profile Info */}
+          <div className={cn(
+            "flex items-center w-full mb-4 pb-4 border-b border-slate-100 dark:border-slate-800/60",
+            isCollapsed ? "justify-center" : "justify-start gap-3 min-w-0 px-2"
+          )}>
+            <div className="w-12 h-12 shrink-0 rounded-full bg-slate-100 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center overflow-hidden">
+              <User className="w-6 h-6 text-slate-400 translate-y-1" />
+            </div>
+            {!isCollapsed && (
+              <div className="flex flex-col min-w-0 pr-2">
+                <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  {user.displayName}
+                </span>
+                <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">
+                  {user.email}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <nav className="w-full space-y-4">
+            {user.role === "admin" && onOpenAdmin && (
+              <div>
+                {!isCollapsed ? (
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 px-4">Admin</h3>
+                ) : (
+                  <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-3" />
+                )}
+                <button
+                  title={isCollapsed ? "Admin Console" : undefined}
+                  onClick={() => {
+                    onNavigate("admin");
+                    onOpenAdmin();
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800",
+                    isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5 w-full"
+                  )}
+                >
+                  <Users className="w-5 h-5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  {!isCollapsed && (
+                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Admin Console</span>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* Main Menu */}
             <div>
               {!isCollapsed ? (
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Main Menu</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 px-4">Main Menu</h3>
               ) : (
-                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6" />
+                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-3" />
               )}
               <div className="space-y-2">
                 {mainMenuItems.map((item) => (
@@ -187,9 +236,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
             {/* Account */}
             <div>
               {!isCollapsed ? (
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4">Account</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3 px-4">Account</h3>
               ) : (
-                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6" />
+                <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-3" />
               )}
               <div className="space-y-2">
                 {accountItems.map((item) => (
@@ -219,65 +268,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
               </div>
             </div>
 
-            {user.role === "admin" && onOpenAdmin && (
-              <div>
-                {!isCollapsed ? (
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-4 mt-8">Admin</h3>
-                ) : (
-                  <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-6 mt-8" />
-                )}
-                <button
-                  title={isCollapsed ? "Admin Console" : undefined}
-                  onClick={() => {
-                    onNavigate("admin");
-                    onOpenAdmin();
-                    if (window.innerWidth < 1024) {
-                      setIsOpen(false);
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center rounded-2xl transition-all duration-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-200 dark:hover:bg-purple-800",
-                    isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5 w-full"
-                  )}
-                >
-                  <Users className="w-5 h-5 shrink-0 text-purple-600 dark:text-purple-400" />
-                  {!isCollapsed && (
-                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Admin Console</span>
-                  )}
-                </button>
-              </div>
-            )}
+
           </nav>
 
-          {/* User Profile */}
+          {/* Log Out Section */}
           <div className={cn(
-            "mt-auto pt-8 border-t border-slate-100 dark:border-slate-800/60 flex items-center w-full",
-            isCollapsed ? "flex-col gap-6 justify-center" : "justify-between"
+            "mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex w-full",
+            isCollapsed ? "justify-center" : "justify-start"
           )}>
-            <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3 min-w-0")}>
-              <div className="w-12 h-12 shrink-0 rounded-full bg-slate-100 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center overflow-hidden">
-                <User className="w-6 h-6 text-slate-400 translate-y-1" />
-              </div>
-              {!isCollapsed && (
-                <div className="flex flex-col min-w-0 pr-2">
-                  <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                    {user.displayName}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-400 truncate max-w-[120px]">
-                    {user.email}
-                  </span>
-                </div>
-              )}
-            </div>
             <button
               title={isCollapsed ? "Log out" : undefined}
               onClick={onLogout}
               className={cn(
-                "shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all",
-                isCollapsed ? "w-10 h-10 flex items-center justify-center" : "p-2"
+                "flex items-center text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all w-full",
+                isCollapsed ? "w-10 h-10 justify-center" : "gap-3.5 px-4 py-3.5"
               )}
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-5 h-5 shrink-0" />
+              {!isCollapsed && (
+                <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Log Out</span>
+              )}
             </button>
           </div>
         </div>
