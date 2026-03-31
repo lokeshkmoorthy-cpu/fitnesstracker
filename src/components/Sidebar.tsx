@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
   const accountItems = [
     { icon: Settings, label: "Settings", id: "settings" },
     { icon: Info, label: "Help", id: "help" },
-    { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
+    // { icon: RefreshCw, label: refreshing ? "Syncing..." : "Refresh", id: "refresh" },
   ];
 
   const menuAction = (id: string) => {
@@ -97,9 +97,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
     if (id === "help" || id === "support") {
       onHelp();
     }
-    if (id === "refresh" && !refreshing) {
-      onRefresh();
-    }
+    // if (id === "refresh" && !refreshing) {
+    //   onRefresh();
+    // }
     // Auto-close on mobile
     if (window.innerWidth < 1024) {
       setIsOpen(false);
@@ -220,7 +220,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     )}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={toggleTheme}
                   title={isCollapsed ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
