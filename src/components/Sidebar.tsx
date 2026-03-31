@@ -173,10 +173,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                   <div className="w-8 h-px bg-slate-100 dark:bg-slate-800/60 mx-auto mb-3" />
                 )}
                 <button
-                  title={isCollapsed ? "Admin Console" : undefined}
+                  title={isCollapsed ? "Command Console" : undefined}
                   onClick={() => {
                     onNavigate("admin");
-                    onOpenAdmin();
                     if (window.innerWidth < 1024) {
                       setIsOpen(false);
                     }

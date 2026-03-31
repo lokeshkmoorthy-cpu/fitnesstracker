@@ -18,6 +18,7 @@ import { GoalsSection, type GoalEditorValues } from "@/src/features/goals/GoalsS
 import { MapsView } from "@/src/features/maps/MapsView";
 import { ScheduleView } from "@/src/features/schedule/ScheduleView";
 import { AdminConsoleModal } from "@/src/components/AdminConsoleModal";
+import { AdminConsoleView } from "@/src/features/admin/AdminConsoleView";
 import { exportDashboardPdf } from "@/src/features/reporting/exportDashboardPdf";
 import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/src/features/workouts/utils";
 import { fitnessApi, setAuthToken } from "@/src/services/api";
@@ -366,6 +367,7 @@ export default function AppMain() {
         <TopBar
           title={
             activeTab === "dashboard" ? "Dashboard" :
+              activeTab === "admin" ? "Command Console" :
               activeTab === "activity" ? "Activity" :
                 activeTab === "maps" ? "Maps" :
                   activeTab === "schedule" ? "Schedule" :
@@ -451,6 +453,13 @@ export default function AppMain() {
               />
               <ActivityTrendChart data={activity} />
             </div> */}
+          </div>
+        )}
+
+        {/* ═══════════════ COMMAND CONSOLE TAB ═══════════════ */}
+        {activeTab === "admin" && (
+          <div className="flex-1 flex flex-col min-h-0">
+            <AdminConsoleView />
           </div>
         )}
 
