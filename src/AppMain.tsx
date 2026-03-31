@@ -497,21 +497,19 @@ export default function AppMain() {
 
         {/* ═══════════════ ACTIVITY TAB ═══════════════ */}
         {activeTab === "activity" && (
-          <div className="flex-1 flex flex-col gap-3">
-            <FilterPanel
-              filters={filters} users={workoutFilterOptions.users}
-              muscleGroups={workoutFilterOptions.muscleGroups} canSelectUser={canSelectUser}
+          <div className="flex-1">
+            <ActivitySection
+              activity={activity}
+              workouts={workouts}
+              filters={filters}
+              users={workoutFilterOptions.users}
+              muscleGroups={workoutFilterOptions.muscleGroups}
+              canSelectUser={canSelectUser}
               exportingPdf={exportingPdf}
-              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-              onClear={clearFilters} onExportPdf={exportReportToPdf}
+              onFilterChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+              onClearFilters={clearFilters}
+              onExportPdf={exportReportToPdf}
             />
-            <div className="flex-1">
-              <ActivitySection 
-                activity={activity} 
-                workouts={filteredWorkouts} 
-                filters={filters}
-              />
-            </div>
           </div>
         )}
 

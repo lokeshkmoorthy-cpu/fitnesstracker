@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivitySquare } from "lucide-react";
+import { ActivitySquare, Flame, Timer } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -17,18 +17,27 @@ interface ActivityTrendChartProps {
 }
 
 export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) => {
+  const summary = React.useMemo(() => {
+    return data.reduce(
+      (acc, current) => {
+        acc.calories += current.calories || 0;
+        acc.activeMinutes += current.activeMinutes || 0;
+        return acc;
+      },
+      { calories: 0, activeMinutes: 0 }
+    );
+  }, [data]);
+
+
   if (!data || data.length === 0) {
     return (
-      <div className="bg-slate-900/50 border border-white/5 p-8 rounded-3xl backdrop-blur-xl">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 text-slate-400 mb-8">
-          <ActivitySquare className="w-4 h-4 text-purple-500" />
-          Activity Trends
-        </h2>
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-           <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center">
-             <ActivitySquare className="w-6 h-6 text-slate-600" />
-           </div>
-           <p className="text-sm font-bold text-slate-500">No activity data available for the selected period</p>
+      <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5 p-12 rounded-[2rem] flex flex-col items-center justify-center text-center gap-4">
+        <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+          <ActivitySquare className="w-8 h-8 text-slate-400 dark:text-slate-600" />
+        </div>
+        <div>
+          <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest">No Activity Records</h3>
+          <p className="text-[11px] font-bold text-slate-400 mt-1">Try adjusting your filters or date range</p>
         </div>
       </div>
     );
@@ -50,11 +59,37 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) 
           </div>
         </div>
         <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-white/5">
-           <div className="px-3 py-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-             <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">Bar Chart View</span>
+          <div className="px-3 py-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+            <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">Bar Chart View</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8 pt-2 border-b border-slate-50 dark:border-white/5 mb-8">
+        <div className="p-6 rounded-[1.5rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-white/5 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
+                 <Flame className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Calories Burned</p>
+                 <p className="text-xl font-black text-slate-900 dark:text-white">{summary.calories.toLocaleString()} <span className="text-xs font-bold text-slate-400">kCal</span></p>
+              </div>
+           </div>
+        </div>
+        <div className="p-6 rounded-[1.5rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-white/5 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-500/10 flex items-center justify-center">
+                 <Timer className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Active Time</p>
+                 <p className="text-xl font-black text-slate-900 dark:text-white">{summary.activeMinutes} <span className="text-xs font-bold text-slate-400">Min</span></p>
+              </div>
            </div>
         </div>
       </div>
+
 
       <div className="h-[360px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -78,9 +113,9 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) 
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148,163,184,0.1)" />
-            <XAxis 
-              dataKey="date" 
-              tick={{ fontSize: 9, fontWeight: 800, fill: "#64748B" }} 
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 9, fontWeight: 800, fill: "#64748B" }}
               axisLine={false}
               tickLine={false}
               dy={15}
@@ -89,16 +124,16 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) 
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
             />
-            <YAxis 
-              yAxisId="left" 
+            <YAxis
+              yAxisId="left"
               tick={{ fontSize: 9, fontWeight: 700, fill: "#94A3B8" }}
               axisLine={false}
               tickLine={false}
               hide
             />
-            <YAxis 
-              yAxisId="right" 
-              orientation="right" 
+            <YAxis
+              yAxisId="right"
+              orientation="right"
               tick={{ fontSize: 9, fontWeight: 700, fill: "#94A3B8" }}
               axisLine={false}
               tickLine={false}
@@ -130,8 +165,8 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) 
                 return null;
               }}
             />
-            <Legend 
-              wrapperStyle={{ paddingTop: 30, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em' }} 
+            <Legend
+              wrapperStyle={{ paddingTop: 30, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em' }}
               iconType="circle"
               iconSize={8}
             />
@@ -142,6 +177,8 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({ data }) 
           </BarChart>
         </ResponsiveContainer>
       </div>
+
     </div>
+
   );
 };
