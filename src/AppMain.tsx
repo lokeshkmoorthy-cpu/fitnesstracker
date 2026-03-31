@@ -434,6 +434,10 @@ export default function AppMain() {
                   onSearchChange={(search) => setFilters((p) => ({ ...p, search }))}
                   filterValue={filters.muscleGroup}
                   onFilterChange={(muscleGroup) => setFilters((p) => ({ ...p, muscleGroup }))}
+                  users={workoutFilterOptions.users}
+                  selectedUser={filters.user}
+                  onUserChange={(user) => setFilters((p) => ({ ...p, user }))}
+                  showUserFilter={canSelectUser}
                 />
               </div>
             </div>
