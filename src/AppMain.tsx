@@ -465,7 +465,11 @@ export default function AppMain() {
               onClear={clearFilters} onExportPdf={exportReportToPdf}
             />
             <div className="flex-1">
-              <ActivitySection activity={activity} />
+              <ActivitySection 
+                activity={activity} 
+                workouts={filteredWorkouts} 
+                filters={filters}
+              />
             </div>
           </div>
         )}
