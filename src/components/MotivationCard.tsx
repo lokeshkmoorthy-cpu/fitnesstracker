@@ -61,14 +61,14 @@ export const MotivationCard: React.FC<MotivationCardProps> = ({ quotes, loading 
             </p>
           </div>
         </div>
-        <div className="inline-flex rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-950/50 p-1">
+        <div className="inline-flex rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-950/50 p-1.5">
           {(["ta", "en", "fr"] as MotivationQuoteLanguage[]).map((lang) => (
             <button
               key={lang}
               type="button"
               onClick={() => setLanguage(lang)}
               className={clsx(
-                "px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors",
+                "px-3.5 py-1.5 text-xs md:text-sm font-bold rounded-lg transition-colors",
                 language === lang
                   ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-sm"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -80,11 +80,11 @@ export const MotivationCard: React.FC<MotivationCardProps> = ({ quotes, loading 
         </div>
       </div>
 
-      <div className="relative mt-3 rounded-xl border border-indigo-100/80 dark:border-white/10 bg-gradient-to-r from-white to-indigo-50/60 dark:from-slate-900 dark:to-indigo-950/40 px-4 py-3">
-        <p className="text-sm md:text-base font-medium leading-relaxed text-slate-700 dark:text-slate-100">
+      <div className="relative mt-3 rounded-xl border border-indigo-100/80 dark:border-white/10 bg-gradient-to-r from-white to-indigo-50/60 dark:from-slate-900 dark:to-indigo-950/40 px-4 py-3.5">
+        <p className="text-base md:text-lg font-medium leading-relaxed text-slate-700 dark:text-slate-100">
           {loading ? "Loading quote of the day..." : `"${dailyQuote.quote}"`}
         </p>
-        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+        <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
           {loading ? "..." : dailyQuote.author || LANGUAGE_LABELS[dailyQuote.language]}
         </p>
       </div>
