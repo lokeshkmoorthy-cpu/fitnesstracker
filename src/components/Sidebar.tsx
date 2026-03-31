@@ -188,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 >
                   <Users className="w-5 h-5 shrink-0 text-purple-600 dark:text-purple-400" />
                   {!isCollapsed && (
-                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Admin Console</span>
+                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Command Console</span>
                   )}
                 </button>
               </div>
