@@ -293,8 +293,8 @@ export default function AppMain() {
   };
 
   const createGoal = async (goal: GoalEditorValues) => {
-    const targetUser = canSelectUser ? filters.user : authUser?.displayName || "";
-    if (!targetUser || targetUser === "all") return;
+    const targetUser = (canSelectUser && filters.user !== "all") ? filters.user : authUser?.displayName || "";
+    if (!targetUser) return;
     setSavingGoals(true);
     try {
       await fitnessApi.createGoal({ user: targetUser, ...goal });
@@ -303,8 +303,8 @@ export default function AppMain() {
   };
 
   const updateGoal = async (goalId: string, goal: GoalEditorValues) => {
-    const targetUser = canSelectUser ? filters.user : authUser?.displayName || "";
-    if (!targetUser || targetUser === "all") return;
+    const targetUser = (canSelectUser && filters.user !== "all") ? filters.user : authUser?.displayName || "";
+    if (!targetUser) return;
     setSavingGoals(true);
     try {
       await fitnessApi.updateGoal(goalId, goal);
@@ -314,8 +314,8 @@ export default function AppMain() {
   };
 
   const deleteGoal = async (goalId: string) => {
-    const targetUser = canSelectUser ? filters.user : authUser?.displayName || "";
-    if (!targetUser || targetUser === "all") return;
+    const targetUser = (canSelectUser && filters.user !== "all") ? filters.user : authUser?.displayName || "";
+    if (!targetUser) return;
     setSavingGoals(true);
     try {
       await fitnessApi.deleteGoal(goalId);
@@ -381,38 +381,38 @@ export default function AppMain() {
             {/* Left: stack tightly — avoids grid row-span stretching the hero/stats row above the chart */}
             <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
               <DashboardHero userName={authUser.displayName} onAddClick={openAdminConsole} />
-              <div className="grid grid-cols-3 gap-2">
-                <StatCard label="Total Exercises" value={filteredWorkouts.length}
-                  icon={<Activity className="w-5 h-5" />} trend="+12%" subtitle="From last week" />
-                <StatCard label="Active Time" value={`${Math.round(filteredWorkouts.length * 0.75)}h`}
-                  icon={<Flame className="w-5 h-5" />} trend="+5%" subtitle="Total activity" />
-                <StatCard label="Workout Days" value={new Set(filteredWorkouts.map((w) => w.date)).size}
-                  icon={<Zap className="w-5 h-5" />} trend="+2" subtitle="Consistency" />
-              </div>
+              <div className="grid grid-cols-12 gap-3 min-h-0">
+                <div className="col-span-3 flex flex-col gap-3">
+                  <StatCard label="Total Exercises" value={filteredWorkouts.length}
+                    icon={<Activity className="w-5 h-5" />} trend="+12%" subtitle="From last week" />
+                  <StatCard label="Workout Days" value={new Set(filteredWorkouts.map((w) => w.date)).size}
+                    icon={<Zap className="w-5 h-5" />} trend="+2" subtitle="Consistency" />
+                </div>
 
-              <div className="rounded-xl border border-neutral-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 px-3 py-2 shrink-0 min-h-0">
-                <AttendanceHeatmap
-                  records={attendance}
-                  rangeStart={attendanceApiRange.from}
-                  rangeEnd={attendanceApiRange.to}
-                  userFilter={
-                    canSelectUser
-                      ? {
-                        value: filters.user,
-                        options: workoutFilterOptions.users,
-                        onChange: (user) =>
-                          setFilters((p) => ({ ...p, user })),
-                      }
-                      : undefined
-                  }
-                  viewerLabel={
-                    canSelectUser
-                      ? undefined
-                      : `Your attendance · ${authUser.displayName}`
-                  }
-                  onRefresh={refetchAttendance}
-                  refreshing={attendanceRefreshing}
-                />
+                <div className="col-span-9 rounded-xl border border-neutral-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 px-3 py-2 flex flex-col min-h-0">
+                  <AttendanceHeatmap
+                    records={attendance}
+                    rangeStart={attendanceApiRange.from}
+                    rangeEnd={attendanceApiRange.to}
+                    userFilter={
+                      canSelectUser
+                        ? {
+                          value: filters.user,
+                          options: workoutFilterOptions.users,
+                          onChange: (user) =>
+                            setFilters((p) => ({ ...p, user })),
+                        }
+                        : undefined
+                    }
+                    viewerLabel={
+                      canSelectUser
+                        ? undefined
+                        : `Your attendance · ${authUser.displayName}`
+                    }
+                    onRefresh={refetchAttendance}
+                    refreshing={attendanceRefreshing}
+                  />
+                </div>
               </div>
 
               <div className="h-[240px] shrink-0 min-h-0">
@@ -429,7 +429,7 @@ export default function AppMain() {
               </div>
             </div>
 
-            <div className="w-[260px] shrink-0 flex flex-col gap-3">
+            {/* <div className="w-[260px] shrink-0 flex flex-col gap-3">
               <GoalProgressCard
                 current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
                 total={selectedGoal?.stepsGoal || 10000}
@@ -437,7 +437,7 @@ export default function AppMain() {
                 onSetGoalClick={scrollToGoals}
               />
               <ActivityTrendChart data={activity} />
-            </div>
+            </div> */}
           </div>
         )}
 
@@ -480,6 +480,8 @@ export default function AppMain() {
             <div ref={goalsSectionRef} className="overflow-auto">
               <GoalsSection
                 selectedUser={canSelectUser ? filters.user : authUser.displayName}
+                currentUserName={authUser.displayName}
+                isAdmin={canSelectUser}
                 goals={goals} selectedGoalId={selectedGoalId} streaks={streaks}
                 userWiseGoals={userWiseGoals} saving={savingGoals}
                 onSelectGoal={setSelectedGoalId} onCreate={createGoal}
@@ -489,9 +491,10 @@ export default function AppMain() {
             <GoalProgressCard
               fillHeight
               current={activity.reduce((s, d) => s + (d.steps || 0), 0)}
-              total={selectedGoal?.stepsGoal || 10000}
+              total={selectedGoal?.stepsGoal || 0}
               label=" Steps"
-              onSetGoalClick={() => goalsSectionRef.current?.scrollIntoView()}
+              onSetGoalClick={() => goalsSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
+              hasGoal={!!selectedGoal}
             />
           </div>
         )}

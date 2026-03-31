@@ -9,6 +9,7 @@ interface GoalProgressCardProps {
   onSetGoalClick?: () => void;
   /** When true, card fills parent height (e.g. Goals sidebar). Default: natural height for dashboard flex layout. */
   fillHeight?: boolean;
+  hasGoal?: boolean;
 }
 
 export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
@@ -17,13 +18,14 @@ export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
   label,
   onSetGoalClick,
   fillHeight = false,
+  hasGoal = true,
 }) => {
-  const percentage = Math.min(100, Math.max(0, (current / total) * 100));
+  const percentage = total > 0 ? Math.min(100, Math.max(0, (current / total) * 100)) : 0;
 
   // Semi-circle path calculation
   const radius = 40;
   const circumference = Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - percentage / 100);
+  const strokeDashoffset = circumference * (1 - (hasGoal ? percentage : 0) / 100);
 
   return (
     <div
@@ -34,10 +36,17 @@ export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
     >
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-1">
-          <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
-            Set your Fitness Goals <br />
-            <span className="text-slate-400">for the quality of your health</span>
-          </h3>
+          {hasGoal ? (
+            <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
+              Set your Fitness Goals <br />
+              <span className="text-slate-400">for the quality of your health</span>
+            </h3>
+          ) : (
+            <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
+              You don't have goals <br />
+              <span className="text-slate-400 italic">Create a goal to track progress</span>
+            </h3>
+          )}
         </div>
       </div>
 
@@ -68,21 +77,36 @@ export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
           />
         </svg>
         <div className="text-center -mt-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Daily Goal</span>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{current}/{total}{label}</div>
+          {hasGoal ? (
+            <>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Daily Goal</span>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                {current}/{total}{label}
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Active Goal</span>
+              <div className="text-2xl font-bold text-slate-300 dark:text-slate-600 tracking-tight">-- / --</div>
+            </>
+          )}
         </div>
       </div>
 
       <div className="mt-8 pt-6 border-t border-slate-50 dark:border-white/5 flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400">You have reached {Math.round(percentage)}% of your goal this month</span>
+        <span className="text-xs font-medium text-slate-400">
+          {hasGoal
+            ? `You have reached ${Math.round(percentage)}% of your goal this month`
+            : "Set a goal to see your monthly progress here"}
+        </span>
       </div>
 
       <button
         onClick={onSetGoalClick}
         className="mt-4 flex items-center justify-between w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/10 rounded-2xl group-hover:bg-purple-600 dark:group-hover:bg-purple-500 group-hover:text-white transition-all text-sm font-bold text-slate-600 dark:text-slate-300"
       >
-        <span>Set Fitness Goals</span>
-        <ArrowRight className="w-4 h-4" />
+        <span>{hasGoal ? "Update Fitness Goals" : "Create Goal Now"}</span>
+        <ArrowRight className="w-4 h-4 ml-2" />
       </button>
     </div>
   );
