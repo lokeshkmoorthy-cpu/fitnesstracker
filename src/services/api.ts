@@ -86,6 +86,12 @@ export const fitnessApi = {
     }),
   me: () => fetchJson<{ user: AuthUser }>("/api/auth/me"),
   getAdminUsers: () => fetchJson<AuthUser[]>("/api/admin/users"),
+  updateAdminUser: (userId: string, payload: Partial<AuthUser>) =>
+    fetchJson<{ success: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
   getWorkouts: () => fetchJson<Workout[]>("/api/workouts"),
   getDailyActivity: (params: { user?: string; from?: string; to?: string }) => {
     const query = new URLSearchParams();

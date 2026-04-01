@@ -75,6 +75,8 @@ export interface AuthUser {
   displayName: string;
   role: "user" | "admin";
   phoneNumber?: string;
+  address?: string;
+  goals?: string;
 }
 
 export interface AuthResponse {

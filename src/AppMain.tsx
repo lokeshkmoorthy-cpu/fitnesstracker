@@ -20,6 +20,7 @@ import { MapsView } from "@/src/features/maps/MapsView";
 import { ScheduleView } from "@/src/features/schedule/ScheduleView";
 import { AdminConsoleModal } from "@/src/components/AdminConsoleModal";
 import { AdminConsoleView } from "@/src/features/admin/AdminConsoleView";
+import { AdminUserInfoView } from "@/src/features/admin/AdminUserInfoView";
 import { exportDashboardPdf } from "@/src/features/reporting/exportDashboardPdf";
 import { aggregateMuscleGroups, buildWorkoutFilters, filterWorkouts } from "@/src/features/workouts/utils";
 import { fitnessApi, setAuthToken } from "@/src/services/api";
@@ -399,6 +400,7 @@ export default function AppMain() {
           title={
             activeTab === "dashboard" ? "Dashboard" :
               activeTab === "admin" ? "Command Console" :
+              activeTab === "admin-users" ? "User Info" :
               activeTab === "activity" ? "Activity" :
                 activeTab === "maps" ? "Maps" :
                   activeTab === "schedule" ? "Schedule" :
@@ -492,6 +494,13 @@ export default function AppMain() {
         {activeTab === "admin" && (
           <div className="flex-1 flex flex-col min-h-0">
             <AdminConsoleView />
+          </div>
+        )}
+
+        {/* ═══════════════ USER INFO TAB ═══════════════ */}
+        {activeTab === "admin-users" && (
+          <div className="flex-1 flex flex-col min-h-0">
+            <AdminUserInfoView />
           </div>
         )}
 

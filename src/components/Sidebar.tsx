@@ -190,6 +190,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                     <span className="text-sm font-semibold tracking-tight whitespace-nowrap">Command Console</span>
                   )}
                 </button>
+                <button
+                  title={isCollapsed ? "User Info" : undefined}
+                  onClick={() => {
+                    onNavigate("admin-users");
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center rounded-2xl transition-all duration-200 mt-2",
+                    isCollapsed ? "justify-center w-12 h-12 mx-auto" : "gap-3.5 px-4 py-3.5 w-full",
+                    activeItem === "admin-users"
+                      ? "bg-purple-100 text-purple-900 dark:bg-purple-900/50 dark:text-purple-100 shadow-sm"
+                      : "text-slate-500 hover:bg-purple-50 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-300"
+                  )}
+                >
+                  <User className={cn("w-5 h-5 shrink-0 transition-colors", activeItem === "admin-users" ? "text-purple-700 dark:text-purple-300" : "text-slate-400")} />
+                  {!isCollapsed && (
+                    <span className="text-sm font-semibold tracking-tight whitespace-nowrap">User Info</span>
+                  )}
+                </button>
               </div>
             )}
 

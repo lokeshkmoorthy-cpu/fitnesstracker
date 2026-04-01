@@ -131,6 +131,8 @@ interface UserRecord {
   telegramUsername: string;
   telegramLinkedAt: string;
   phoneNumber?: string;
+  address?: string;
+  goals?: string;
 }
 
 interface SessionRecord {
@@ -173,6 +175,8 @@ interface SafeUser {
   displayName: string;
   role: "user" | "admin";
   phoneNumber?: string;
+  address?: string;
+  goals?: string;
 }
 
 type Role = "user" | "admin";
@@ -428,6 +432,8 @@ async function ensureAuthSheets() {
       "telegramUsername",
       "telegramLinkedAt",
       "phoneNumber",
+      "address",
+      "goals",
     ]);
     await ensureSheetWithHeaders(SESSIONS_SHEET, [
       "sessionId",
@@ -495,7 +501,7 @@ async function getUsers(): Promise<UserRecord[]> {
   if (usersCache && now - usersCache.at < USERS_CACHE_TTL_MS) {
     return usersCache.data;
   }
-  const rows = await readSheetRows(`${USERS_SHEET}!A:M`);
+  const rows = await readSheetRows(`${USERS_SHEET}!A:N`);
   const headers = [
     "userid",
     "email",
@@ -510,6 +516,8 @@ async function getUsers(): Promise<UserRecord[]> {
     "telegramusername",
     "telegramlinkedat",
     "phonenumber",
+    "address",
+    "goals",
   ];
   const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
     const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
@@ -535,6 +543,8 @@ async function getUsers(): Promise<UserRecord[]> {
       telegramUsername: normalizeTelegramUsername(getWithFallbackIndex("telegramusername", 10)),
       telegramLinkedAt: getWithFallbackIndex("telegramlinkedat", 11),
       phoneNumber: getWithFallbackIndex("phonenumber", 12),
+      address: getWithFallbackIndex("address", 13),
+      goals: getWithFallbackIndex("goals", 14),
     };
   }).filter((user) => Boolean(user.userId && user.email));
   usersCache = { at: now, data: list };
@@ -556,6 +566,8 @@ function serializeUserRow(user: UserRecord): Array<string | number> {
     user.telegramUsername,
     user.telegramLinkedAt,
     user.phoneNumber || "",
+    user.address || "",
+    user.goals || "",
   ];
 }
 
@@ -902,6 +914,8 @@ const toSafeUser = (record: UserRecord): SafeUser => ({
   displayName: record.displayName,
   role: record.role,
   phoneNumber: record.phoneNumber,
+  address: record.address,
+  goals: record.goals,
 });
 
 function getAuthToken(req: express.Request) {
@@ -1212,7 +1226,7 @@ async function telegramBuiltinVerify(ctx: TelegramSlashContext): Promise<void> {
       telegramLinkedAt: nowIso(),
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:N${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();
@@ -1238,7 +1252,7 @@ async function telegramBuiltinUnlink(ctx: TelegramSlashContext): Promise<void> {
       telegramLinkedAt: "",
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:N${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();
@@ -1534,6 +1548,7 @@ app.post("/api/auth/signup", async (req, res) => {
   const password = String(req.body?.password || "");
   const displayName = normalizeUser(String(req.body?.displayName || ""));
   const phoneNumber = String(req.body?.phoneNumber || "").trim();
+  const address = String(req.body?.address || "").trim();
 
   if (!EMAIL_REGEX.test(email)) {
     return res.status(400).json({ error: "Valid email is required" });
@@ -1555,7 +1570,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const userId = randomUUID();
     const passwordHash = await bcrypt.hash(password, 10);
     const role: Role = users.length === 0 ? "admin" : "user";
-    await appendSheetRow(`${USERS_SHEET}!A:M`, [
+    await appendSheetRow(`${USERS_SHEET}!A:O`, [
       userId,
       email,
       passwordHash,
@@ -1569,13 +1584,15 @@ app.post("/api/auth/signup", async (req, res) => {
       "",
       "",
       phoneNumber,
+      address,
+      "",
     ]);
     invalidateUsersCache();
 
     const session = await createSession(userId, req);
     await logAuditEvent(userId, "signup", userId, { email, role });
 
-    const user: SafeUser = { userId, email, displayName, role, phoneNumber };
+    const user: SafeUser = { userId, email, displayName, role, phoneNumber, address, goals: "" };
     res.status(201).json({
       token: session.tokenValue,
       expiresAt: session.expiresAt,
@@ -1625,7 +1642,7 @@ app.post("/api/auth/login", async (req, res) => {
       lastLoginAt: now,
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:O${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();
@@ -1686,11 +1703,54 @@ app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res) 
         displayName: entry.displayName,
         role: entry.role,
         isActive: entry.isActive,
+        phoneNumber: entry.phoneNumber,
+        address: entry.address,
+        goals: entry.goals,
       }))
     );
   } catch (error) {
     console.error("Fetch users error:", error);
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+app.put("/api/admin/users/:userId", requireAuth, requireRole("admin"), async (req, res) => {
+  if (!ensureSpreadsheetId(res)) return;
+  const targetUserId = req.params.userId;
+  if (!targetUserId) return res.status(400).json({ error: "userId is required" });
+
+  try {
+    const users = await getUsers();
+    const user = users.find((u) => u.userId === targetUserId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const { displayName, email, phoneNumber, address, goals } = req.body || {};
+    const updatedUser: UserRecord = {
+      ...user,
+      displayName: typeof displayName === "string" ? normalizeUser(displayName) : user.displayName,
+      email: typeof email === "string" ? normalizeEmail(email) : user.email,
+      phoneNumber: typeof phoneNumber === "string" ? phoneNumber.trim() : user.phoneNumber,
+      address: typeof address === "string" ? address.trim() : user.address,
+      goals: typeof goals === "string" ? goals.trim() : user.goals,
+      updatedAt: nowIso(),
+    };
+
+    if (updatedUser.email !== user.email && !EMAIL_REGEX.test(updatedUser.email)) {
+      return res.status(400).json({ error: "Valid email is required" });
+    }
+
+    await updateSheetRow(
+      `${USERS_SHEET}!A${user.rowIndex}:O${user.rowIndex}`,
+      serializeUserRow(updatedUser)
+    );
+    invalidateUsersCache();
+    await logAuditEvent(req.authUser!.userId, "admin_user_update", targetUserId, {
+      updatedFields: { displayName: updatedUser.displayName, email: updatedUser.email, phoneNumber: updatedUser.phoneNumber, address: updatedUser.address, goals: updatedUser.goals },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ error: "Failed to update user" });
   }
 });
 
