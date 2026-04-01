@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { clsx } from "clsx";
 import type { MotivationQuote, MotivationQuoteLanguage } from "@/src/types/fitness";
 
 interface MotivationCardProps {
@@ -34,12 +33,13 @@ function pickDailyQuote(quotes: MotivationQuote[], language: MotivationQuoteLang
 }
 
 export const MotivationCard: React.FC<MotivationCardProps> = ({ quotes, loading = false }) => {
-  const [language, setLanguage] = useState<MotivationQuoteLanguage>("en");
+  const [language] = useState<MotivationQuoteLanguage>("en");
 
   const scopedQuotes = useMemo(
     () => quotes.filter((quote) => quote.language === language),
     [quotes, language]
   );
+
   const dailyQuote = useMemo(() => pickDailyQuote(scopedQuotes, language), [scopedQuotes, language]);
 
   return (
@@ -47,7 +47,7 @@ export const MotivationCard: React.FC<MotivationCardProps> = ({ quotes, loading 
       <div className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-indigo-400/20 blur-3xl dark:bg-fuchsia-500/20" />
       <div className="pointer-events-none absolute -bottom-14 -left-8 h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl dark:bg-cyan-500/20" />
 
-      <div className="relative flex items-center justify-between gap-3">
+      <div className="relative flex items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-md">
             <Sparkles className="h-4 w-4" />
@@ -60,23 +60,6 @@ export const MotivationCard: React.FC<MotivationCardProps> = ({ quotes, loading 
               Futuristic Mindset Feed
             </p>
           </div>
-        </div>
-        <div className="inline-flex rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-950/50 p-1.5">
-          {(["ta", "en", "fr"] as MotivationQuoteLanguage[]).map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              onClick={() => setLanguage(lang)}
-              className={clsx(
-                "px-3.5 py-1.5 text-xs md:text-sm font-bold rounded-lg transition-colors",
-                language === lang
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shadow-sm"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-              )}
-            >
-              {LANGUAGE_LABELS[lang]}
-            </button>
-          ))}
         </div>
       </div>
 
