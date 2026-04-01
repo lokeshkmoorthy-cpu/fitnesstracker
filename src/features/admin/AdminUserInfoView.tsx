@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Loader2, User, Mail, Phone, MapPin, Edit2, Check, X, Users, Target } from "lucide-react";
+import { Loader2, User, Mail, Phone, MapPin, Edit2, Check, X, Users, Target, ChevronDown } from "lucide-react";
 import { fitnessApi } from "@/src/services/api";
 import type { AuthUser } from "@/src/types/fitness";
 
@@ -136,20 +136,25 @@ export const AdminUserInfoView = () => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-2">Select User:</span>
-          <select
-            value={selectedUser}
-            onChange={(e) => {
-              setSelectedUser(e.target.value);
-              setEditingField(null);
-            }}
-            className="h-9 pl-3 pr-8 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 ring-purple-500/20 appearance-none cursor-pointer"
-          >
-            {users.map((u) => (
-              <option key={u.userId} value={u.userId}>
-                {u.displayName} ({u.email})
-              </option>
-            ))}
-          </select>
+          <div className="relative group">
+            <select
+              value={selectedUser}
+              onChange={(e) => {
+                setSelectedUser(e.target.value);
+                setEditingField(null);
+              }}
+              className="peer h-9 pl-3 pr-8 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 ring-purple-500/20 appearance-none cursor-pointer w-full transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm"
+            >
+              {users.map((u) => (
+                <option key={u.userId} value={u.userId}>
+                  {u.displayName} ({u.email})
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none transition-all">
+              <ChevronDown className="w-4 h-4 text-slate-400 peer-hover:text-purple-500 peer-hover:filter peer-hover:drop-shadow-[0_0_8px_rgba(168,85,247,0.8)] transition-all duration-300" />
+            </div>
+          </div>
         </div>
       </div>
 
