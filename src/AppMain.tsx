@@ -284,7 +284,7 @@ export default function AppMain() {
     } finally { setAuthSubmitting(false); }
   };
 
-  const handleSignup = async (payload: { email: string; password: string; displayName: string }) => {
+  const handleSignup = async (payload: { email: string; password: string; displayName: string; phoneNumber?: string }) => {
     setAuthSubmitting(true);
     try {
       const res = await fitnessApi.signup(payload);

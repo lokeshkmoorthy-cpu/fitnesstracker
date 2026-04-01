@@ -4,7 +4,7 @@ import { LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 interface AuthPanelProps {
   loading: boolean;
   onLogin: (payload: { email: string; password: string }) => Promise<void>;
-  onSignup: (payload: { email: string; password: string; displayName: string }) => Promise<void>;
+  onSignup: (payload: { email: string; password: string; displayName: string; phoneNumber?: string }) => Promise<void>;
 }
 
 export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup }) => {
@@ -12,6 +12,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -22,7 +23,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
       if (mode === "login") {
         await onLogin({ email, password });
       } else {
-        await onSignup({ email, password, displayName });
+        await onSignup({ email, password, displayName, phoneNumber });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
@@ -44,16 +45,28 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ loading, onLogin, onSignup
 
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" ? (
-            <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">
-              Display Name
-              <input
-                type="text"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                className="h-10 rounded-lg bg-slate-900 border border-slate-700 px-3 text-sm text-slate-100 outline-none focus:border-cyan-300/80 hover:border-cyan-400/60 transition-colors"
-                required
-              />
-            </label>
+            <>
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">
+                Display Name
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="h-10 rounded-lg bg-slate-900 border border-slate-700 px-3 text-sm text-slate-100 outline-none focus:border-cyan-300/80 hover:border-cyan-400/60 transition-colors"
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">
+                Phone Number
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  className="h-10 rounded-lg bg-slate-900 border border-slate-700 px-3 text-sm text-slate-100 outline-none focus:border-cyan-300/80 hover:border-cyan-400/60 transition-colors"
+                  required
+                />
+              </label>
+            </>
           ) : null}
           <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">
             Email

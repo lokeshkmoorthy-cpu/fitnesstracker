@@ -40,6 +40,7 @@ interface SignupPayload {
   email: string;
   password: string;
   displayName: string;
+  phoneNumber?: string;
 }
 
 interface LoginPayload {

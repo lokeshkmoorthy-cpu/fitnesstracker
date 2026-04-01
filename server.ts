@@ -130,6 +130,7 @@ interface UserRecord {
   telegramChatId: string;
   telegramUsername: string;
   telegramLinkedAt: string;
+  phoneNumber?: string;
 }
 
 interface SessionRecord {
@@ -171,6 +172,7 @@ interface SafeUser {
   email: string;
   displayName: string;
   role: "user" | "admin";
+  phoneNumber?: string;
 }
 
 type Role = "user" | "admin";
@@ -425,6 +427,7 @@ async function ensureAuthSheets() {
       "telegramChatId",
       "telegramUsername",
       "telegramLinkedAt",
+      "phoneNumber",
     ]);
     await ensureSheetWithHeaders(SESSIONS_SHEET, [
       "sessionId",
@@ -492,7 +495,7 @@ async function getUsers(): Promise<UserRecord[]> {
   if (usersCache && now - usersCache.at < USERS_CACHE_TTL_MS) {
     return usersCache.data;
   }
-  const rows = await readSheetRows(`${USERS_SHEET}!A:L`);
+  const rows = await readSheetRows(`${USERS_SHEET}!A:M`);
   const headers = [
     "userid",
     "email",
@@ -506,6 +509,7 @@ async function getUsers(): Promise<UserRecord[]> {
     "telegramchatid",
     "telegramusername",
     "telegramlinkedat",
+    "phonenumber",
   ];
   const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
     const get = (name: string) => row[actualHeaders.indexOf(name)] || "";
@@ -530,6 +534,7 @@ async function getUsers(): Promise<UserRecord[]> {
       telegramChatId: normalizeChatId(getWithFallbackIndex("telegramchatid", 9)),
       telegramUsername: normalizeTelegramUsername(getWithFallbackIndex("telegramusername", 10)),
       telegramLinkedAt: getWithFallbackIndex("telegramlinkedat", 11),
+      phoneNumber: getWithFallbackIndex("phonenumber", 12),
     };
   }).filter((user) => Boolean(user.userId && user.email));
   usersCache = { at: now, data: list };
@@ -550,6 +555,7 @@ function serializeUserRow(user: UserRecord): Array<string | number> {
     user.telegramChatId,
     user.telegramUsername,
     user.telegramLinkedAt,
+    user.phoneNumber || "",
   ];
 }
 
@@ -895,6 +901,7 @@ const toSafeUser = (record: UserRecord): SafeUser => ({
   email: record.email,
   displayName: record.displayName,
   role: record.role,
+  phoneNumber: record.phoneNumber,
 });
 
 function getAuthToken(req: express.Request) {
@@ -1205,7 +1212,7 @@ async function telegramBuiltinVerify(ctx: TelegramSlashContext): Promise<void> {
       telegramLinkedAt: nowIso(),
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();
@@ -1231,7 +1238,7 @@ async function telegramBuiltinUnlink(ctx: TelegramSlashContext): Promise<void> {
       telegramLinkedAt: "",
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();
@@ -1521,10 +1528,12 @@ if (bot) {
 app.use(express.json());
 
 app.post("/api/auth/signup", async (req, res) => {
+  console.log("Signup request:", req.body);
   if (!ensureSpreadsheetId(res)) return;
   const email = normalizeEmail(String(req.body?.email || ""));
   const password = String(req.body?.password || "");
   const displayName = normalizeUser(String(req.body?.displayName || ""));
+  const phoneNumber = String(req.body?.phoneNumber || "").trim();
 
   if (!EMAIL_REGEX.test(email)) {
     return res.status(400).json({ error: "Valid email is required" });
@@ -1546,7 +1555,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const userId = randomUUID();
     const passwordHash = await bcrypt.hash(password, 10);
     const role: Role = users.length === 0 ? "admin" : "user";
-    await appendSheetRow(`${USERS_SHEET}!A:L`, [
+    await appendSheetRow(`${USERS_SHEET}!A:M`, [
       userId,
       email,
       passwordHash,
@@ -1559,13 +1568,14 @@ app.post("/api/auth/signup", async (req, res) => {
       "",
       "",
       "",
+      phoneNumber,
     ]);
     invalidateUsersCache();
 
     const session = await createSession(userId, req);
     await logAuditEvent(userId, "signup", userId, { email, role });
 
-    const user: SafeUser = { userId, email, displayName, role };
+    const user: SafeUser = { userId, email, displayName, role, phoneNumber };
     res.status(201).json({
       token: session.tokenValue,
       expiresAt: session.expiresAt,
@@ -1615,7 +1625,7 @@ app.post("/api/auth/login", async (req, res) => {
       lastLoginAt: now,
     };
     await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:L${user.rowIndex}`,
+      `${USERS_SHEET}!A${user.rowIndex}:M${user.rowIndex}`,
       serializeUserRow(updatedUser)
     );
     invalidateUsersCache();

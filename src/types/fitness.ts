@@ -74,6 +74,7 @@ export interface AuthUser {
   email: string;
   displayName: string;
   role: "user" | "admin";
+  phoneNumber?: string;
 }
 
 export interface AuthResponse {
