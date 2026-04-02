@@ -191,6 +191,12 @@ const telegramPendingLinks = new Map<
 const googleEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const googleKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
+if (!googleEmail || !googleKey) {
+  console.warn("WARNING: Google Search account email or key missing from env!");
+} else {
+  console.log("Found Google Auth credentials in environment.");
+}
+
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: googleEmail,
