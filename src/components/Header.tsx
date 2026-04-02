@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh, refreshing, user, onL
           <Dumbbell className="text-[#07080D] w-5 h-5" />
         </div>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase dark:text-white data-[theme=light]:text-slate-900">Lokesh Fitness</h1>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase dark:text-white data-[theme=light]:text-slate-900">Fit Tracker</h1>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400 data-[theme=light]:text-slate-500">Realtime workout intelligence</p>
         </div>
       </div>

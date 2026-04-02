@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onRefresh, refreshing, o
                 </div>
                 {!isCollapsed && (
                   <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate whitespace-nowrap">
-                    Fit Tracker
+                    Lokesh Fitness
                   </span>
                 )}
               </div>
