@@ -10,7 +10,7 @@ import type {
 } from "@/src/types/fitness";
 
 // ✅ ADD THIS LINE (IMPORTANT)
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || "";
 
 interface GoalPayload {
   user: string;
