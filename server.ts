@@ -7,6 +7,7 @@ import { google } from "googleapis";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
+
 dotenv.config();
 
 declare global {
@@ -187,9 +188,9 @@ const telegramPendingLinks = new Map<
   string,
   { userId: string; email: string; code: string; expiresAt: number; attempts: number }
 >();
-
+const credentials = require("./credentials.json");
 const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  keyFile: require("./credentials.json"),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
