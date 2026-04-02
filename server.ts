@@ -188,9 +188,14 @@ const telegramPendingLinks = new Map<
   string,
   { userId: string; email: string; code: string; expiresAt: number; attempts: number }
 >();
-const credentials = require("./credentials.json");
+const googleEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const googleKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: require("./credentials.json"),
+  credentials: {
+    client_email: googleEmail,
+    private_key: googleKey,
+  },
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
