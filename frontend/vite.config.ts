@@ -26,4 +26,10 @@ export default defineConfig(({ mode }) => {
       // `npm run dev` uses Express + Vite middleware on 3030 only — proxy is unused then.
       proxy: {
         '/api': {
-    
+          target: 'http://127.0.0.1:3030',
+          changeOrigin: true,
+        },
+      },
+    },
+  };
+});

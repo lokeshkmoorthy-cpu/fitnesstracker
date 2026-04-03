@@ -44,4 +44,4 @@ There are two ways replies are chosen for slash commands:
 1. **Built-in (hardcoded in `backend/src/server.ts`)** — `/start`, `/link`, `/verify`, `/unlink`, `/in`, `/today` (`/in` and `/today` both mark attendance). These run first and send fixed or computed messages (welcome text, OTP, attendance, etc.).
 2. **BotCommands sheet** — Any other command (e.g. `/chest`, `/shoulder`) is looked up in the `BotCommands` tab; the **response** column text is sent to the user. Rows that duplicate a built-in command name are ignored so the sheet never overrides linking or attendance commands.
 
-If replies look wrong or outdated (e.g. “Unknown command” listing only `/link`…`/start` and no `/in` or `/today`), another server instance is probably still using the same bot
+If replies look wrong or outdated (e.g. “Unknown command” listing only `/link`…`/start` and no `/in` or `/today`), another server instance is probably still using the same bot token or old code—fix the **single poller** issue above and redeploy.
