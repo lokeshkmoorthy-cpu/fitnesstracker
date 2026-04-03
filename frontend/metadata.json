@@ -1,0 +1,25 @@
+{
+  "name": "FitSheet Bot",
+  "version": "1.1.0",
+  "description": "FitSheet Bot is a smart workout tracking assistant for Telegram, seamlessly logging your fitness sessions into Google Sheets and providing AI-powered analysis to help optimize your training.",
+  "author": "FitSheet Team",
+  "homepage": "https://github.com/your-org/fitsheet-bot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/fitsheet-bot.git"
+  },
+  "license": "MIT",
+  "requestFramePermissions": [
+    "read",
+    "write"
+  ],
+  "keywords": [
+    "telegram",
+    "fitness",
+    "bot",
+    "google sheets",
+    "workout tracker",
+    "ai",
+    "analysis"
+  ]
+}
