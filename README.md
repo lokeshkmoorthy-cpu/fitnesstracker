@@ -23,7 +23,7 @@ View your app in AI Studio: https://ai.studio/apps/a1291618-522f-4700-823f-e8de5
    - `PORT=3030`
    - `GEMINI_API_KEY=...` (only if Gemini features are used)
 5. Run the app:
-   `npm run dev` (this runs [`server-main.ts`](server-main.ts), which imports [`server.ts`](server.ts) — edit the bot in `server.ts`.)
+   `npm run dev` (runs the **backend** workspace: [`backend/src/index.ts`](backend/src/index.ts) → [`backend/src/server.ts`](backend/src/server.ts). The UI lives under [`frontend/`](frontend/).)
 
 ## Telegram bot (single poller)
 
@@ -41,7 +41,7 @@ Telegram allows **only one** active `getUpdates` long-polling connection per bot
 
 There are two ways replies are chosen for slash commands:
 
-1. **Built-in (hardcoded in `server.ts`)** — `/start`, `/link`, `/verify`, `/unlink`, `/in`, `/today` (`/in` and `/today` both mark attendance). These run first and send fixed or computed messages (welcome text, OTP, attendance, etc.).
+1. **Built-in (hardcoded in `backend/src/server.ts`)** — `/start`, `/link`, `/verify`, `/unlink`, `/in`, `/today` (`/in` and `/today` both mark attendance). These run first and send fixed or computed messages (welcome text, OTP, attendance, etc.).
 2. **BotCommands sheet** — Any other command (e.g. `/chest`, `/shoulder`) is looked up in the `BotCommands` tab; the **response** column text is sent to the user. Rows that duplicate a built-in command name are ignored so the sheet never overrides linking or attendance commands.
 
-If replies look wrong or outdated (e.g. “Unknown command” listing only `/link`…`/start` and no `/in` or `/today`), another server instance is probably still using the same bot token or old code—fix the **single poller** issue above and redeploy.
+If replies look wrong or outdated (e.g. “Unknown command” listing only `/link`…`/start` and no `/in` or `/today`), another server instance is probably still using the same bot

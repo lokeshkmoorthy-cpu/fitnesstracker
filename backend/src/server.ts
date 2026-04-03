@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { fileURLToPath } from "node:url";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import TelegramBot from "node-telegram-bot-api";
@@ -7,8 +8,12 @@ import { google } from "googleapis";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../..");
+const frontendRoot = path.join(repoRoot, "frontend");
 
-dotenv.config();
+dotenv.config({ path: path.join(repoRoot, ".env") });
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 declare global {
   namespace Express {
@@ -21,7 +26,7 @@ declare global {
 }
 
 const app = express();
-const PORT = 3030;
+const PORT = Number(process.env.PORT) || 3030;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -2168,6 +2173,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
+      root: frontendRoot,
       server: { middlewareMode: true },
       appType: "spa",
     });
@@ -2179,7 +2185,7 @@ async function startServer() {
       return vite.middlewares(req, res, next);
     });
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = path.join(frontendRoot, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       if (req.path.startsWith("/api")) {

@@ -77,7 +77,7 @@
 
 ## File Structure
 ```
-src/
+frontend/src/
 ├── components/
 │   ├── Header.tsx (updated)
 │   ├── Sidebar.tsx (new)
@@ -86,5 +86,5 @@ src/
 │   └── ThemeContext.tsx (new)
 └── AppMain.tsx (updated)
 
-tailwind.config.js (new)
+frontend/tailwind.config.js (new)
 ```
