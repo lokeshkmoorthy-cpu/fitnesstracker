@@ -7,6 +7,7 @@ import TelegramBot from "node-telegram-bot-api";
 import { google } from "googleapis";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
+import { assertCriticalEnvForProduction } from "./config/env";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
@@ -1558,6 +1559,10 @@ if (bot) {
 
 app.use(express.json());
 
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.post("/api/auth/signup", async (req, res) => {
   console.log("Signup request:", req.body);
   if (!ensureSpreadsheetId(res)) return;
@@ -2162,6 +2167,7 @@ app.get("/api/streaks", requireAuth, async (req, res) => {
 });
 
 async function startServer() {
+  assertCriticalEnvForProduction();
   if (SPREADSHEET_ID) {
     try {
       await ensureAuthSheets();
@@ -2200,4 +2206,4 @@ async function startServer() {
   });
 }
 
-startServer();
+export { app, startServer };

@@ -1,14 +1,15 @@
 import mysql from 'mysql2/promise';
+import { env } from "./config/env";
 
 // It is highly recommended to use a connection pool in web applications
 // rather than a single connection. This allows for concurrent requests to
 // be handled efficiently and automatically manages reconnecting.
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'gymdb.crisycy6emka.ap-southeast-2.rds.amazonaws.com',
-  user: process.env.DB_USER || 'admin',
-  password: process.env.DB_PASSWORD || 'Lokesh9113',
-  database: process.env.DB_NAME || 'gymdb',
-  port: Number(process.env.DB_PORT) || 3306,
+  host: env.dbHost,
+  user: env.dbUser,
+  password: env.dbPassword,
+  database: env.dbName,
+  port: env.dbPort,
   waitForConnections: true,
   connectionLimit: 10,  // adjust this value based on your RDS instance size
   queueLimit: 0

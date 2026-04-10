@@ -1,1 +1,3 @@
-import "./server";
+import { startServer } from "./app";
+
+void startServer();
