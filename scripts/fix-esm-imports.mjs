@@ -21,8 +21,9 @@ export function fixEsmImportsInDir(dir) {
     if (entry.isDirectory()) {
       fixEsmImportsInDir(full);
     } else if (entry.name.endsWith('.js')) {
-      const updated = fixEsmImports(fs.readFileSync(full, 'utf8'));
-      fs.writeFileSync(full, updated);
+      const original = fs.readFileSync(full, 'utf8');
+      const updated = fixEsmImports(original);
+      if (updated !== original) fs.writeFileSync(full, updated);
     }
   }
 }

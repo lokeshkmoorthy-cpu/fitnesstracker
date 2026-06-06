@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "node src/index.js",
+    "dev:watch": "node --watch --watch-path=src src/index.js",
     "build": "node ../scripts/copy-backend.mjs",
     "start": "node dist/index.js",
     "start:dev": "node src/index.js",
