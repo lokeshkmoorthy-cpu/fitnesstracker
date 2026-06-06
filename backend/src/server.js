@@ -4,15 +4,12 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import TelegramBot from "node-telegram-bot-api";
-import { google } from "googleapis";
 import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
+import pool from "./database.js";
 import { assertCriticalEnvForProduction } from "./config/env.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
 const frontendRoot = path.join(repoRoot, "frontend");
-dotenv.config({ path: path.join(repoRoot, ".env") });
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const app = express();
 const PORT = Number(process.env.PORT) || 3030;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,22 +55,25 @@ const MOTIVATION_MESSAGES = [
 const loginAttemptMap = /* @__PURE__ */ new Map();
 const telegramLinkRateMap = /* @__PURE__ */ new Map();
 const telegramPendingLinks = /* @__PURE__ */ new Map();
-const googleEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const googleKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-if (!googleEmail || !googleKey) {
-  console.warn("WARNING: Google Search account email or key missing from env!");
-} else {
-  console.log("Found Google Auth credentials in environment.");
+const sqlDt = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 23).replace("T", " ");
+};
+const sqlNow = () => sqlDt((/* @__PURE__ */ new Date()).toISOString());
+const isoFromSql = (value) => {
+  if (!value) return "";
+  const text = String(value);
+  const normalized = text.includes(" ") ? text.replace(" ", "T") : text;
+  const withZone = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+  const d = new Date(withZone);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+};
+async function query(sql, params) {
+  const [rows] = await pool.query(sql, params);
+  return rows;
 }
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: googleEmail,
-    private_key: googleKey
-  },
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"]
-});
-const sheets = google.sheets({ version: "v4", auth });
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 let bot = null;
 if (token) {
@@ -151,13 +151,7 @@ const normalizeGoalName = (value) => {
 const normalizeChatId = (chatId) => String(chatId).trim();
 const normalizeTelegramUsername = (value) => (value || "").trim();
 const generateOtpCode = () => `${Math.floor(1e5 + Math.random() * 9e5)}`;
-const ensureSpreadsheetId = (res) => {
-  if (!SPREADSHEET_ID) {
-    res.status(500).json({ error: "GOOGLE_SHEET_ID not configured" });
-    return false;
-  }
-  return true;
-};
+const ensureSpreadsheetId = () => true;
 const parseDateRange = (fromRaw, toRaw) => {
   const from = toIsoDate(fromRaw) || "1970-01-01";
   const to = toIsoDate(toRaw) || todayIsoDate();
@@ -173,140 +167,135 @@ const isGoalMet = (activity, goal) => {
   ];
   return checks.every(Boolean);
 };
-async function readSheetRows(range) {
-  if (!SPREADSHEET_ID) return [];
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range
-  });
-  return response.data.values || [];
-}
-async function appendSheetRow(range, row) {
-  if (!SPREADSHEET_ID) return;
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] }
-  });
-}
-async function updateSheetRow(range, row) {
-  if (!SPREADSHEET_ID) return;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] }
-  });
-}
-function mapRows(rows, fallbackHeaders, mapper) {
-  if (!rows.length) return [];
-  const firstRow = rows[0].map(normalizeHeader);
-  const isHeaderRow = firstRow.some((header) => fallbackHeaders.includes(header));
-  const headers = isHeaderRow ? firstRow : fallbackHeaders;
-  const dataRows = isHeaderRow ? rows.slice(1) : rows;
-  const startRow = isHeaderRow ? 2 : 1;
-  return dataRows.map((row, index) => mapper(row, headers, startRow + index));
-}
-async function ensureSheetWithHeaders(title, headers) {
-  if (!SPREADSHEET_ID) return;
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_ID,
-    fields: "sheets(properties(title))"
-  });
-  const existingTitles = new Set(
-    (meta.data.sheets || []).map((sheet) => sheet.properties?.title).filter(Boolean)
-  );
-  if (!existingTitles.has(title)) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title } } }]
-      }
-    });
-  }
-  const firstRow = await readSheetRows(`${title}!1:1`);
-  if (!firstRow.length || firstRow[0].length === 0) {
-    await updateSheetRow(`${title}!1:1`, headers);
-    return;
-  }
-  const current = [...firstRow[0]];
-  const normalizedCurrent = current.map(normalizeHeader);
-  let needsUpdate = false;
-  headers.forEach((header, index) => {
-    const normalizedHeader = normalizeHeader(header);
-    const exists = normalizedCurrent.includes(normalizedHeader);
-    if (exists) return;
-    if (!current[index]) {
-      current[index] = header;
-      needsUpdate = true;
-      return;
-    }
-    current.push(header);
-    needsUpdate = true;
-  });
-  if (needsUpdate) {
-    await updateSheetRow(`${title}!1:1`, current);
+async function ensureSchema() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS users (
+      userId CHAR(36) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      passwordHash VARCHAR(255) NOT NULL,
+      displayName VARCHAR(120) NOT NULL,
+      role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
+      isActive BOOLEAN NOT NULL DEFAULT TRUE,
+      createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      lastLoginAt DATETIME(3) NULL,
+      telegramChatId VARCHAR(64) NULL,
+      telegramUsername VARCHAR(64) NULL,
+      telegramLinkedAt DATETIME(3) NULL,
+      phoneNumber VARCHAR(32) NULL,
+      address VARCHAR(255) NULL,
+      goals TEXT NULL,
+      PRIMARY KEY (userId),
+      UNIQUE KEY uq_users_email (email),
+      KEY idx_users_role_active (role, isActive),
+      KEY idx_users_telegram_chat (telegramChatId)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS sessions (
+      sessionId CHAR(36) NOT NULL,
+      userId CHAR(36) NOT NULL,
+      tokenHash CHAR(64) NOT NULL,
+      expiresAt DATETIME(3) NOT NULL,
+      createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      revokedAt DATETIME(3) NULL,
+      ip VARCHAR(64) NULL,
+      userAgent VARCHAR(512) NULL,
+      PRIMARY KEY (sessionId),
+      UNIQUE KEY uq_sessions_token_hash (tokenHash),
+      KEY idx_sessions_user (userId),
+      KEY idx_sessions_expires (expiresAt)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS workouts (
+      workoutId BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      userId CHAR(36) NOT NULL,
+      username VARCHAR(120) NOT NULL,
+      date DATE NOT NULL,
+      musclegroup VARCHAR(120) NOT NULL,
+      exercises TEXT NULL,
+      setsreps VARCHAR(120) NULL,
+      notes TEXT NULL,
+      PRIMARY KEY (workoutId),
+      KEY idx_workouts_user_date (userId, date),
+      KEY idx_workouts_username_date (username, date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS audit_log (
+      eventId CHAR(36) NOT NULL,
+      userId CHAR(36) NULL,
+      eventType VARCHAR(80) NOT NULL,
+      targetId VARCHAR(120) NULL,
+      metadataJson JSON NULL,
+      createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (eventId),
+      KEY idx_audit_user_created (userId, createdAt),
+      KEY idx_audit_type_created (eventType, createdAt)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS goals (
+      goalId CHAR(36) NOT NULL,
+      userId CHAR(36) NOT NULL,
+      username VARCHAR(120) NOT NULL,
+      goalName VARCHAR(120) NOT NULL,
+      period ENUM('daily', 'weekly') NOT NULL,
+      stepsGoal INT UNSIGNED NOT NULL DEFAULT 0,
+      distanceGoalKm DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+      caloriesGoal INT UNSIGNED NOT NULL DEFAULT 0,
+      activeMinutesGoal INT UNSIGNED NOT NULL DEFAULT 0,
+      isActive BOOLEAN NOT NULL DEFAULT TRUE,
+      updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      description TEXT NULL,
+      targetValue DECIMAL(10,2) NULL,
+      targetUnit VARCHAR(32) NULL,
+      PRIMARY KEY (goalId),
+      KEY idx_goals_user_active (userId, isActive),
+      KEY idx_goals_period (period)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS activity (
+      activityId BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      userId CHAR(36) NOT NULL,
+      username VARCHAR(120) NOT NULL,
+      date DATE NOT NULL,
+      steps INT UNSIGNED NOT NULL DEFAULT 0,
+      distanceKm DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+      calories INT UNSIGNED NOT NULL DEFAULT 0,
+      activeMinutes INT UNSIGNED NOT NULL DEFAULT 0,
+      notes TEXT NULL,
+      PRIMARY KEY (activityId),
+      UNIQUE KEY uq_activity_user_date (userId, date),
+      KEY idx_activity_username_date (username, date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS bot_commands (
+      command VARCHAR(64) NOT NULL,
+      response TEXT NOT NULL,
+      updatedAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (command)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS attendance (
+      attendanceId BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      name VARCHAR(120) NOT NULL,
+      date DATE NOT NULL,
+      time TIME NULL,
+      day VARCHAR(16) NULL,
+      userId CHAR(36) NULL,
+      chatId VARCHAR(64) NULL,
+      PRIMARY KEY (attendanceId),
+      UNIQUE KEY uq_attendance_user_date (userId, date),
+      KEY idx_attendance_name_date (name, date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS motivation_quotes (
+      quoteId BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      quote TEXT NOT NULL,
+      author VARCHAR(120) NULL,
+      language ENUM('ta', 'en', 'fr') NOT NULL DEFAULT 'en',
+      PRIMARY KEY (quoteId),
+      KEY idx_quotes_language (language)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  ];
+  for (const statement of statements) {
+    await pool.query(statement);
   }
 }
 async function ensureAuthSheets() {
   try {
-    console.log("Checking sheets...");
-    await ensureSheetWithHeaders(USERS_SHEET, [
-      "userId",
-      "email",
-      "passwordHash",
-      "displayName",
-      "role",
-      "isActive",
-      "createdAt",
-      "updatedAt",
-      "lastLoginAt",
-      "telegramChatId",
-      "telegramUsername",
-      "telegramLinkedAt",
-      "phoneNumber",
-      "address",
-      "goals"
-    ]);
-    await ensureSheetWithHeaders(SESSIONS_SHEET, [
-      "sessionId",
-      "userId",
-      "tokenHash",
-      "expiresAt",
-      "createdAt",
-      "revokedAt",
-      "ip",
-      "userAgent"
-    ]);
-    await ensureSheetWithHeaders(AUDIT_SHEET, [
-      "eventId",
-      "userId",
-      "eventType",
-      "targetId",
-      "metadataJson",
-      "createdAt"
-    ]);
-    await ensureSheetWithHeaders(GOALS_SHEET, [
-      "userId",
-      "username",
-      "goalId",
-      "goalName",
-      "period",
-      "stepsGoal",
-      "distanceGoalKm",
-      "caloriesGoal",
-      "activeMinutesGoal",
-      "description",
-      "targetValue",
-      "targetUnit",
-      "isactive",
-      "updatedat"
-    ]);
-    await ensureSheetWithHeaders(ATTENDANCE_SHEET, ["Name", "Date", "Time", "Day", "User ID", "Chat ID"]);
-    await ensureSheetWithHeaders(MOTIVATION_QUOTES_SHEET, ["quote", "author", "language"]);
-    console.log("Ensuring BotCommands sheet...");
-    await ensureSheetWithHeaders(BOT_COMMANDS_SHEET, ["command", "response", "updatedAt"]);
+    console.log("Ensuring database schema...");
+    await ensureSchema();
     console.log("Fetching existing bot commands...");
     const existingCommands = await getBotCommands();
     if (existingCommands.length === 0) {
@@ -320,12 +309,15 @@ async function ensureAuthSheets() {
         ["/tricep", "\u{1F3CB}\uFE0F TRICEP WORKOUT (5 Exercises)\n\n1\uFE0F\u20E3 Tricep Pushdown\n\u{1F449} 4 sets \xD7 10\u201312 reps\n\u{1F449} Variation: Rope / Bar\n\u{1F449} Tip: Full extension\n\n2\uFE0F\u20E3 Dips\n\u{1F449} 3 sets \xD7 8\u201312 reps\n\u{1F449} Tip: Keep body upright\n\n3\uFE0F\u20E3 Skull Crushers\n\u{1F449} 3 sets \xD7 10\u201312 reps\n\u{1F449} Tip: Control movement\n\n4\uFE0F\u20E3 Overhead Extension\n\u{1F449} 3 sets \xD7 10\u201312 reps\n\u{1F449} Variation: Dumbbell / Cable\n\u{1F449} Tip: Stretch fully\n\n5\uFE0F\u20E3 Close Grip Bench Press\n\u{1F449} 3 sets \xD7 8\u201310 reps\n\u{1F449} Tip: Keep elbows close\n\n\u{1F525} Focus: Long head activation\n\u{1F4A7} Rest: 45\u201360 sec", nowIso()]
       ];
       for (const row of defaults) {
-        await appendSheetRow(BOT_COMMANDS_RANGE, row);
+        await query(
+          "INSERT INTO bot_commands (command, response, updatedAt) VALUES (?, ?, ?)",
+          [row[0], row[1], sqlNow()]
+        );
       }
       console.log("Default bot commands populated.");
     }
   } catch (error) {
-    console.error("FATAL: Failed to ensure auth sheets:", error);
+    console.error("FATAL: Failed to ensure database schema:", error);
     process.exit(1);
   }
 }
@@ -334,73 +326,73 @@ async function getUsers() {
   if (usersCache && now - usersCache.at < USERS_CACHE_TTL_MS) {
     return usersCache.data;
   }
-  const rows = await readSheetRows(`${USERS_SHEET}!A:N`);
-  const headers = [
-    "userid",
-    "email",
-    "passwordhash",
-    "displayname",
-    "role",
-    "isactive",
-    "createdat",
-    "updatedat",
-    "lastloginat",
-    "telegramchatid",
-    "telegramusername",
-    "telegramlinkedat",
-    "phonenumber",
-    "address",
-    "goals"
-  ];
-  const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    const getWithFallbackIndex = (name, fallbackIndex) => {
-      const value = get(name);
-      if (value) return value;
-      return row[fallbackIndex] || "";
-    };
-    const roleValue = get("role");
-    const role = roleValue === "admin" ? "admin" : "user";
-    return {
-      rowIndex,
-      userId: get("userid"),
-      email: normalizeEmail(get("email")),
-      passwordHash: get("passwordhash"),
-      displayName: get("displayname"),
-      role,
-      isActive: get("isactive") !== "false",
-      createdAt: get("createdat") || nowIso(),
-      updatedAt: get("updatedat") || nowIso(),
-      lastLoginAt: get("lastloginat"),
-      telegramChatId: normalizeChatId(getWithFallbackIndex("telegramchatid", 9)),
-      telegramUsername: normalizeTelegramUsername(getWithFallbackIndex("telegramusername", 10)),
-      telegramLinkedAt: getWithFallbackIndex("telegramlinkedat", 11),
-      phoneNumber: getWithFallbackIndex("phonenumber", 12),
-      address: getWithFallbackIndex("address", 13),
-      goals: getWithFallbackIndex("goals", 14)
-    };
-  }).filter((user) => Boolean(user.userId && user.email));
+  const rows = await query(
+    "SELECT userId, email, passwordHash, displayName, role, isActive, createdAt, updatedAt, lastLoginAt, telegramChatId, telegramUsername, telegramLinkedAt, phoneNumber, address, goals FROM users"
+  );
+  const list = rows.map((row) => ({
+    userId: row.userId,
+    email: normalizeEmail(row.email || ""),
+    passwordHash: row.passwordHash || "",
+    displayName: row.displayName || "",
+    role: row.role === "admin" ? "admin" : "user",
+    isActive: row.isActive !== 0 && row.isActive !== false,
+    createdAt: isoFromSql(row.createdAt) || nowIso(),
+    updatedAt: isoFromSql(row.updatedAt) || nowIso(),
+    lastLoginAt: isoFromSql(row.lastLoginAt),
+    telegramChatId: row.telegramChatId ? normalizeChatId(row.telegramChatId) : "",
+    telegramUsername: normalizeTelegramUsername(row.telegramUsername || ""),
+    telegramLinkedAt: isoFromSql(row.telegramLinkedAt),
+    phoneNumber: row.phoneNumber || "",
+    address: row.address || "",
+    goals: row.goals || ""
+  })).filter((user) => Boolean(user.userId && user.email));
   usersCache = { at: now, data: list };
   return list;
 }
-function serializeUserRow(user) {
-  return [
-    user.userId,
-    user.email,
-    user.passwordHash,
-    user.displayName,
-    user.role,
-    user.isActive ? "true" : "false",
-    user.createdAt,
-    user.updatedAt,
-    user.lastLoginAt,
-    user.telegramChatId,
-    user.telegramUsername,
-    user.telegramLinkedAt,
-    user.phoneNumber || "",
-    user.address || "",
-    user.goals || ""
-  ];
+async function insertUser(user) {
+  await query(
+    "INSERT INTO users (userId, email, passwordHash, displayName, role, isActive, createdAt, updatedAt, lastLoginAt, telegramChatId, telegramUsername, telegramLinkedAt, phoneNumber, address, goals) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      user.userId,
+      user.email,
+      user.passwordHash,
+      user.displayName,
+      user.role,
+      user.isActive ? 1 : 0,
+      sqlDt(user.createdAt) || sqlNow(),
+      sqlDt(user.updatedAt) || sqlNow(),
+      sqlDt(user.lastLoginAt),
+      user.telegramChatId || null,
+      user.telegramUsername || null,
+      sqlDt(user.telegramLinkedAt),
+      user.phoneNumber || null,
+      user.address || null,
+      user.goals || null
+    ]
+  );
+  invalidateUsersCache();
+}
+async function persistUser(user) {
+  await query(
+    "UPDATE users SET email = ?, passwordHash = ?, displayName = ?, role = ?, isActive = ?, updatedAt = ?, lastLoginAt = ?, telegramChatId = ?, telegramUsername = ?, telegramLinkedAt = ?, phoneNumber = ?, address = ?, goals = ? WHERE userId = ?",
+    [
+      user.email,
+      user.passwordHash,
+      user.displayName,
+      user.role,
+      user.isActive ? 1 : 0,
+      sqlDt(user.updatedAt) || sqlNow(),
+      sqlDt(user.lastLoginAt),
+      user.telegramChatId || null,
+      user.telegramUsername || null,
+      sqlDt(user.telegramLinkedAt),
+      user.phoneNumber || null,
+      user.address || null,
+      user.goals || null,
+      user.userId
+    ]
+  );
+  invalidateUsersCache();
 }
 function checkTelegramLinkRate(chatId) {
   const now = Date.now();
@@ -420,87 +412,70 @@ async function getSessions() {
   if (sessionsCache && now - sessionsCache.at < SESSIONS_CACHE_TTL_MS) {
     return sessionsCache.data;
   }
-  const rows = await readSheetRows(`${SESSIONS_SHEET}!A:H`);
-  const headers = [
-    "sessionid",
-    "userid",
-    "tokenhash",
-    "expiresat",
-    "createdat",
-    "revokedat",
-    "ip",
-    "useragent"
-  ];
-  const list = mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    return {
-      rowIndex,
-      sessionId: get("sessionid"),
-      userId: get("userid"),
-      tokenHash: get("tokenhash"),
-      expiresAt: get("expiresat"),
-      createdAt: get("createdat"),
-      revokedAt: get("revokedat"),
-      ip: get("ip"),
-      userAgent: get("useragent")
-    };
-  }).filter((session) => Boolean(session.sessionId && session.tokenHash));
+  const rows = await query(
+    "SELECT sessionId, userId, tokenHash, expiresAt, createdAt, revokedAt, ip, userAgent FROM sessions"
+  );
+  const list = rows.map((row) => ({
+    sessionId: row.sessionId,
+    userId: row.userId,
+    tokenHash: row.tokenHash,
+    expiresAt: isoFromSql(row.expiresAt),
+    createdAt: isoFromSql(row.createdAt),
+    revokedAt: isoFromSql(row.revokedAt),
+    ip: row.ip || "",
+    userAgent: row.userAgent || ""
+  })).filter((session) => Boolean(session.sessionId && session.tokenHash));
   sessionsCache = { at: now, data: list };
   return list;
 }
 async function logAuditEvent(userId, eventType, targetId, metadata) {
-  await appendSheetRow(`${AUDIT_SHEET}!A:F`, [
-    randomUUID(),
-    userId,
-    eventType,
-    targetId,
-    JSON.stringify(metadata),
-    nowIso()
-  ]);
+  await query(
+    "INSERT INTO audit_log (eventId, userId, eventType, targetId, metadataJson, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    [randomUUID(), userId || null, eventType, targetId || null, JSON.stringify(metadata ?? {}), sqlNow()]
+  );
 }
 async function getWorkoutRecords() {
-  const rows = await readSheetRows(WORKOUTS_RANGE);
-  const headers = ["username", "date", "musclegroup", "exercises", "setsreps", "notes"];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      musclegroup: get("musclegroup"),
-      exercises: get("exercises"),
-      setsreps: get("setsreps"),
-      notes: get("notes")
-    };
-  }).filter((entry) => Boolean(entry.date || entry.username));
+  const rows = await query(
+    "SELECT userId, username, date, musclegroup, exercises, setsreps, notes FROM workouts ORDER BY date ASC, workoutId ASC"
+  );
+  return rows.map((row) => ({
+    userId: row.userId || makeUserId(row.username || ""),
+    username: row.username || "",
+    date: toIsoDate(row.date),
+    musclegroup: row.musclegroup || "",
+    exercises: row.exercises || "",
+    setsreps: row.setsreps || "",
+    notes: row.notes || ""
+  })).filter((entry) => Boolean(entry.date || entry.username));
+}
+async function insertWorkout(workout) {
+  await query(
+    "INSERT INTO workouts (userId, username, date, musclegroup, exercises, setsreps, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      makeUserId(workout.username),
+      workout.username,
+      workout.date,
+      workout.muscleGroup,
+      workout.exercises,
+      workout.setsReps,
+      workout.notes
+    ]
+  );
 }
 async function getActivityRecords(workouts) {
-  const rows = await readSheetRows(ACTIVITY_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "date",
-    "steps",
-    "distancekm",
-    "calories",
-    "activeminutes",
-    "notes"
-  ];
-  const activityRows = mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    return {
-      userId: get("userid") || makeUserId(username),
-      username,
-      date: toIsoDate(get("date")),
-      steps: safeNumber(get("steps")),
-      distanceKm: safeNumber(get("distancekm")),
-      calories: safeNumber(get("calories")),
-      activeMinutes: safeNumber(get("activeminutes")),
-      notes: get("notes")
-    };
-  }).filter((entry) => Boolean(entry.date));
+  const rows = await query(
+    "SELECT userId, username, date, steps, distanceKm, calories, activeMinutes, notes FROM activity ORDER BY date ASC, activityId ASC"
+  );
+  const activityRows = rows.map((row) => ({
+    userId: row.userId || makeUserId(row.username || ""),
+    username: row.username || "",
+    date: toIsoDate(row.date),
+    steps: safeNumber(row.steps),
+    distanceKm: safeNumber(row.distanceKm),
+    calories: safeNumber(row.calories),
+    activeMinutes: safeNumber(row.activeMinutes),
+    notes: row.notes || ""
+  })).filter((entry) => Boolean(entry.date));
   if (activityRows.length) return activityRows;
   const map = /* @__PURE__ */ new Map();
   workouts.forEach((workout) => {
@@ -525,28 +500,38 @@ async function getActivityRecords(workouts) {
   return Array.from(map.values());
 }
 async function getAttendanceRecords() {
-  const rows = await readSheetRows(ATTENDANCE_RANGE);
-  const headers = ["name", "date", "time", "day", "userid", "chatid"];
-  return mapRows(rows, headers, (row, actualHeaders) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    return {
-      name: get("name"),
-      date: parseAttendanceDateToIso(get("date")),
-      time: get("time"),
-      day: get("day"),
-      userId: get("userid"),
-      chatId: get("chatid")
-    };
-  }).filter((entry) => Boolean(entry.date));
+  const rows = await query(
+    "SELECT name, date, time, day, userId, chatId FROM attendance ORDER BY date ASC, attendanceId ASC"
+  );
+  return rows.map((row) => ({
+    name: row.name || "",
+    date: parseAttendanceDateToIso(row.date),
+    time: row.time || "",
+    day: row.day || "",
+    userId: row.userId || "",
+    chatId: row.chatId || ""
+  })).filter((entry) => Boolean(entry.date));
+}
+async function hasAttendanceForDate(userId, isoDate) {
+  if (!userId) return false;
+  const rows = await query(
+    "SELECT 1 FROM attendance WHERE userId = ? AND date = ? LIMIT 1",
+    [userId, isoDate]
+  );
+  return rows.length > 0;
+}
+async function insertAttendance(record) {
+  await query(
+    "INSERT INTO attendance (name, date, time, day, userId, chatId) VALUES (?, ?, ?, ?, ?, ?)",
+    [record.name, record.date, record.time, record.day, record.userId || null, record.chatId || null]
+  );
 }
 async function getMotivationQuotes() {
-  const rows = await readSheetRows(MOTIVATION_QUOTES_RANGE);
-  const headers = ["quote", "author", "language"];
-  return mapRows(rows, headers, (row, mappedHeaders) => {
-    const get = (header) => row[mappedHeaders.indexOf(header)] || "";
-    const quote = get("quote").trim();
-    const author = get("author").trim();
-    const language = get("language").trim().toLowerCase();
+  const rows = await query("SELECT quote, author, language FROM motivation_quotes");
+  return rows.map((row) => {
+    const quote = (row.quote || "").trim();
+    const author = (row.author || "").trim();
+    const language = (row.language || "").trim().toLowerCase();
     if (!quote || !SUPPORTED_QUOTE_LANGUAGES.has(language)) {
       return null;
     }
@@ -558,52 +543,25 @@ async function getMotivationQuotes() {
   }).filter((entry) => Boolean(entry));
 }
 async function getGoalsRecords() {
-  const rows = await readSheetRows(GOALS_RANGE);
-  const headers = [
-    "userid",
-    "username",
-    "goalid",
-    "goalname",
-    "period",
-    "stepsgoal",
-    "distancegoalkm",
-    "caloriesgoal",
-    "activeminutesgoal",
-    "description",
-    "targetvalue",
-    "targetunit",
-    "isactive",
-    "updatedat"
-  ];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    const username = get("username");
-    const userId = get("userid") || (username ? makeUserId(username) : "");
-    const periodValue = get("period");
-    const legacyPeriod = row[2] === "weekly" ? "weekly" : row[2] === "daily" ? "daily" : "";
-    const period = periodValue === "weekly" || periodValue === "daily" ? periodValue : legacyPeriod === "weekly" ? "weekly" : "daily";
-    const updatedAt = get("updatedat") || row[7] || nowIso();
-    const goalId = get("goalid") || (userId ? `${userId}-${updatedAt}` : "");
-    const goalName = get("goalname") || "Untitled Goal";
-    const isActiveRaw = get("isactive") || row[8] || "true";
-    return {
-      rowIndex,
-      goalId,
-      userId,
-      username,
-      goalName,
-      period,
-      stepsGoal: safeNumber(get("stepsgoal")),
-      distanceGoalKm: safeNumber(get("distancegoalkm")),
-      caloriesGoal: safeNumber(get("caloriesgoal")),
-      activeMinutesGoal: safeNumber(get("activeminutesgoal")),
-      description: get("description") || row[9] || "",
-      targetValue: safeNumber(get("targetvalue") || row[10]),
-      targetUnit: get("targetunit") || row[11] || "",
-      isActive: isActiveRaw !== "false",
-      updatedAt
-    };
-  }).filter((goal) => Boolean(goal.userId && goal.goalId));
+  const rows = await query(
+    "SELECT goalId, userId, username, goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, description, targetValue, targetUnit, isActive, updatedAt FROM goals"
+  );
+  return rows.map((row) => ({
+    goalId: row.goalId,
+    userId: row.userId || (row.username ? makeUserId(row.username) : ""),
+    username: row.username || "",
+    goalName: row.goalName || "Untitled Goal",
+    period: row.period === "weekly" ? "weekly" : "daily",
+    stepsGoal: safeNumber(row.stepsGoal),
+    distanceGoalKm: safeNumber(row.distanceGoalKm),
+    caloriesGoal: safeNumber(row.caloriesGoal),
+    activeMinutesGoal: safeNumber(row.activeMinutesGoal),
+    description: row.description || "",
+    targetValue: safeNumber(row.targetValue),
+    targetUnit: row.targetUnit || "",
+    isActive: row.isActive !== 0 && row.isActive !== false,
+    updatedAt: isoFromSql(row.updatedAt) || nowIso()
+  })).filter((goal) => Boolean(goal.userId && goal.goalId));
 }
 function defaultGoalForUser(userId, username) {
   const updatedAt = nowIso();
@@ -625,36 +583,58 @@ function defaultGoalForUser(userId, username) {
     updatedAt
   };
 }
-function serializeGoalRow(goal) {
-  return [
-    goal.userId,
-    goal.username,
-    goal.goalId,
-    goal.goalName,
-    goal.period,
-    goal.stepsGoal,
-    goal.distanceGoalKm,
-    goal.caloriesGoal,
-    goal.activeMinutesGoal,
-    goal.description || "",
-    goal.targetValue || 0,
-    goal.targetUnit || "",
-    goal.isActive ? "true" : "false",
-    goal.updatedAt
-  ];
+async function insertGoal(goal) {
+  await query(
+    "INSERT INTO goals (goalId, userId, username, goalName, period, stepsGoal, distanceGoalKm, caloriesGoal, activeMinutesGoal, description, targetValue, targetUnit, isActive, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      goal.goalId,
+      goal.userId,
+      goal.username,
+      goal.goalName,
+      goal.period,
+      goal.stepsGoal,
+      goal.distanceGoalKm,
+      goal.caloriesGoal,
+      goal.activeMinutesGoal,
+      goal.description || null,
+      goal.targetValue || 0,
+      goal.targetUnit || null,
+      goal.isActive ? 1 : 0,
+      sqlDt(goal.updatedAt) || sqlNow()
+    ]
+  );
+}
+async function persistGoal(goal) {
+  await query(
+    "UPDATE goals SET userId = ?, username = ?, goalName = ?, period = ?, stepsGoal = ?, distanceGoalKm = ?, caloriesGoal = ?, activeMinutesGoal = ?, description = ?, targetValue = ?, targetUnit = ?, isActive = ?, updatedAt = ? WHERE goalId = ?",
+    [
+      goal.userId,
+      goal.username,
+      goal.goalName,
+      goal.period,
+      goal.stepsGoal,
+      goal.distanceGoalKm,
+      goal.caloriesGoal,
+      goal.activeMinutesGoal,
+      goal.description || null,
+      goal.targetValue || 0,
+      goal.targetUnit || null,
+      goal.isActive ? 1 : 0,
+      sqlDt(goal.updatedAt) || sqlNow(),
+      goal.goalId
+    ]
+  );
+}
+async function deleteGoalById(goalId) {
+  await query("DELETE FROM goals WHERE goalId = ?", [goalId]);
 }
 async function getBotCommands() {
-  const rows = await readSheetRows(BOT_COMMANDS_RANGE);
-  const headers = ["command", "response", "updatedat"];
-  return mapRows(rows, headers, (row, actualHeaders, rowIndex) => {
-    const get = (name) => row[actualHeaders.indexOf(name)] || "";
-    return {
-      rowIndex,
-      command: get("command"),
-      response: get("response"),
-      updatedAt: get("updatedat") || nowIso()
-    };
-  }).filter((cmd) => Boolean(cmd.command));
+  const rows = await query("SELECT command, response, updatedAt FROM bot_commands");
+  return rows.map((row) => ({
+    command: row.command,
+    response: row.response || "",
+    updatedAt: isoFromSql(row.updatedAt) || nowIso()
+  })).filter((cmd) => Boolean(cmd.command));
 }
 const SESSIONS_CACHE_TTL_MS = 5e3;
 const USERS_CACHE_TTL_MS = 5e3;
@@ -680,26 +660,11 @@ async function getBotCommandsCached() {
   botCommandsCache = { at: now, commands };
   return commands;
 }
-function serializeBotCommandRow(cmd) {
-  return [cmd.command, cmd.response, cmd.updatedAt];
-}
 async function updateBotCommand(command, response) {
-  const commands = await getBotCommands();
-  const existing = commands.find((c) => c.command.toLowerCase() === command.toLowerCase());
-  const now = nowIso();
-  if (existing) {
-    const updated = {
-      ...existing,
-      response,
-      updatedAt: now
-    };
-    await updateSheetRow(
-      `${BOT_COMMANDS_SHEET}!A${existing.rowIndex}:C${existing.rowIndex}`,
-      serializeBotCommandRow(updated)
-    );
-  } else {
-    await appendSheetRow(`${BOT_COMMANDS_SHEET}!A:C`, [command, response, now]);
-  }
+  await query(
+    "INSERT INTO bot_commands (command, response, updatedAt) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE response = VALUES(response), updatedAt = VALUES(updatedAt)",
+    [command, response, sqlNow()]
+  );
   invalidateBotCommandsCache();
 }
 function toPublicGoal(goal) {
@@ -733,16 +698,19 @@ async function createSession(userId, req) {
   const tokenHash = hashToken(tokenValue);
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-  await appendSheetRow(`${SESSIONS_SHEET}!A:H`, [
-    sessionId,
-    userId,
-    tokenHash,
-    expiresAt,
-    createdAt,
-    "",
-    readClientIp(req),
-    String(req.headers["user-agent"] || "")
-  ]);
+  await query(
+    "INSERT INTO sessions (sessionId, userId, tokenHash, expiresAt, createdAt, revokedAt, ip, userAgent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      sessionId,
+      userId,
+      tokenHash,
+      sqlDt(expiresAt),
+      sqlDt(createdAt),
+      null,
+      readClientIp(req),
+      String(req.headers["user-agent"] || "")
+    ]
+  );
   invalidateSessionsCache();
   return { sessionId, tokenValue, expiresAt };
 }
@@ -965,11 +933,7 @@ async function telegramBuiltinVerify(ctx) {
       telegramUsername: ctx.telegramUsername,
       telegramLinkedAt: nowIso()
     };
-    await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:N${user.rowIndex}`,
-      serializeUserRow(updatedUser)
-    );
-    invalidateUsersCache();
+    await persistUser(updatedUser);
     telegramPendingLinks.delete(ctx.chatIdText);
     await ctx.bot.sendMessage(ctx.chatId, "\u2705 Linked successfully!");
   } catch {
@@ -990,11 +954,7 @@ async function telegramBuiltinUnlink(ctx) {
       telegramUsername: "",
       telegramLinkedAt: ""
     };
-    await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:N${user.rowIndex}`,
-      serializeUserRow(updatedUser)
-    );
-    invalidateUsersCache();
+    await persistUser(updatedUser);
     await ctx.bot.sendMessage(ctx.chatId, "Unlinked successfully.");
   } catch {
     await ctx.bot.sendMessage(ctx.chatId, "Unlink failed.");
@@ -1018,8 +978,8 @@ async function telegramBuiltinToday(ctx) {
     const dateStr = now.toLocaleDateString("en-GB");
     const timeStr = now.toLocaleTimeString("en-GB");
     const dayStr = now.toLocaleDateString("en-US", { weekday: "long" });
-    const rows = await readSheetRows(ATTENDANCE_RANGE);
-    const alreadyMarked = rows.some((r) => r[0] === name && r[1] === dateStr);
+    const isoToday = todayIsoDate();
+    const alreadyMarked = await hasAttendanceForDate(linkedUser.userId, isoToday);
     const randomMotivation = MOTIVATION_MESSAGES[Math.floor(Math.random() * MOTIVATION_MESSAGES.length)];
     let workoutCommandsBlock = "\u2014";
     try {
@@ -1041,14 +1001,14 @@ async function telegramBuiltinToday(ctx) {
       );
       return;
     }
-    await appendSheetRow(ATTENDANCE_RANGE, [
+    await insertAttendance({
       name,
-      dateStr,
-      timeStr,
-      dayStr,
-      linkedUser.userId,
-      ctx.chatIdText
-    ]);
+      date: isoToday,
+      time: timeStr,
+      day: dayStr,
+      userId: linkedUser.userId,
+      chatId: ctx.chatIdText
+    });
     await ctx.bot.sendMessage(
       ctx.chatId,
       [
@@ -1220,14 +1180,7 @@ if (bot) {
         return;
       }
       const workout = parseWorkoutManual(trimmedText, linkedUser.displayName);
-      await appendSheetRow(WORKOUTS_RANGE, [
-        workout.username,
-        workout.date,
-        workout.muscleGroup,
-        workout.exercises,
-        workout.setsReps,
-        workout.notes
-      ]);
+      await insertWorkout(workout);
       await bot.sendMessage(
         chatId,
         `Logged ${workout.muscleGroup} workout \u{1F4AA}`
@@ -1268,24 +1221,23 @@ app.post("/api/auth/signup", async (req, res) => {
     const userId = randomUUID();
     const passwordHash = await bcrypt.hash(password, 10);
     const role = users.length === 0 ? "admin" : "user";
-    await appendSheetRow(`${USERS_SHEET}!A:O`, [
+    await insertUser({
       userId,
       email,
       passwordHash,
       displayName,
       role,
-      "true",
-      now,
-      now,
-      now,
-      "",
-      "",
-      "",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      lastLoginAt: now,
+      telegramChatId: "",
+      telegramUsername: "",
+      telegramLinkedAt: "",
       phoneNumber,
       address,
-      ""
-    ]);
-    invalidateUsersCache();
+      goals: ""
+    });
     const session = await createSession(userId, req);
     await logAuditEvent(userId, "signup", userId, { email, role });
     const user = { userId, email, displayName, role, phoneNumber, address, goals: "" };
@@ -1331,11 +1283,7 @@ app.post("/api/auth/login", async (req, res) => {
       updatedAt: now,
       lastLoginAt: now
     };
-    await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:O${user.rowIndex}`,
-      serializeUserRow(updatedUser)
-    );
-    invalidateUsersCache();
+    await persistUser(updatedUser);
     const session = await createSession(user.userId, req);
     await logAuditEvent(user.userId, "login_success", user.userId, { email });
     res.json({
@@ -1357,16 +1305,7 @@ app.post("/api/auth/logout", requireAuth, async (req, res) => {
     const sessions = await getSessions();
     const session = sessions.find((entry) => entry.sessionId === req.authSessionId);
     if (session) {
-      await updateSheetRow(`${SESSIONS_SHEET}!A${session.rowIndex}:H${session.rowIndex}`, [
-        session.sessionId,
-        session.userId,
-        session.tokenHash,
-        session.expiresAt,
-        session.createdAt,
-        nowIso(),
-        session.ip,
-        session.userAgent
-      ]);
+      await query("UPDATE sessions SET revokedAt = ? WHERE sessionId = ?", [sqlNow(), session.sessionId]);
       invalidateSessionsCache();
     }
     await logAuditEvent(req.authUser.userId, "logout", req.authUser.userId, {});
@@ -1421,11 +1360,7 @@ app.put("/api/admin/users/:userId", requireAuth, requireRole("admin"), async (re
     if (updatedUser.email !== user.email && !EMAIL_REGEX.test(updatedUser.email)) {
       return res.status(400).json({ error: "Valid email is required" });
     }
-    await updateSheetRow(
-      `${USERS_SHEET}!A${user.rowIndex}:O${user.rowIndex}`,
-      serializeUserRow(updatedUser)
-    );
-    invalidateUsersCache();
+    await persistUser(updatedUser);
     await logAuditEvent(req.authUser.userId, "admin_user_update", targetUserId, {
       updatedFields: { displayName: updatedUser.displayName, email: updatedUser.email, phoneNumber: updatedUser.phoneNumber, address: updatedUser.address, goals: updatedUser.goals }
     });
@@ -1572,7 +1507,7 @@ app.post("/api/goals", requireAuth, async (req, res) => {
       isActive: isActive === false ? false : true,
       updatedAt: nowIso()
     };
-    await appendSheetRow(GOALS_RANGE, serializeGoalRow(createdGoal));
+    await insertGoal(createdGoal);
     await logAuditEvent(req.authUser.userId, "goal_create", createdGoal.goalId, {
       userId: targetUserId,
       goalName: parsedName,
@@ -1634,7 +1569,7 @@ app.put("/api/goals/:goalId", requireAuth, async (req, res) => {
       isActive: isActive === false ? false : true,
       updatedAt: nowIso()
     };
-    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:N${existing.rowIndex}`, serializeGoalRow(updatedGoal));
+    await persistGoal(updatedGoal);
     await logAuditEvent(req.authUser.userId, "goal_update", updatedGoal.goalId, {
       userId: updatedGoal.userId,
       goalName: updatedGoal.goalName,
@@ -1661,22 +1596,7 @@ app.delete("/api/goals/:goalId", requireAuth, async (req, res) => {
     if (req.authUser.role !== "admin" && existing.userId !== req.authUser.userId) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    await updateSheetRow(`${GOALS_SHEET}!A${existing.rowIndex}:N${existing.rowIndex}`, [
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ""
-    ]);
+    await deleteGoalById(goalId);
     await logAuditEvent(req.authUser.userId, "goal_delete", existing.goalId, {
       userId: existing.userId,
       goalName: existing.goalName
@@ -1799,13 +1719,11 @@ app.get("/api/streaks", requireAuth, async (req, res) => {
 });
 async function startServer() {
   assertCriticalEnvForProduction();
-  if (SPREADSHEET_ID) {
-    try {
-      await ensureAuthSheets();
-      console.log("Auth sheets verified.");
-    } catch (error) {
-      console.error("Failed to verify auth sheets:", error);
-    }
+  try {
+    await ensureAuthSheets();
+    console.log("Database schema verified.");
+  } catch (error) {
+    console.error("Failed to verify database schema:", error);
   }
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

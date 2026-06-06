@@ -1,5 +1,8 @@
 -- MySQL 8+ migration
--- Creates tables equivalent to the existing Google Sheets tabs.
+-- Creates tables equivalent to the former Google Sheets tabs.
+-- Note: no foreign keys are used, because some userId values are derived
+-- slugs (e.g. bot-logged workouts / admin-created goals) rather than real
+-- user UUIDs, mirroring the original schema-less Sheets behavior.
 
 CREATE TABLE IF NOT EXISTS users (
   userId CHAR(36) NOT NULL,
@@ -35,10 +38,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   PRIMARY KEY (sessionId),
   UNIQUE KEY uq_sessions_token_hash (tokenHash),
   KEY idx_sessions_user (userId),
-  KEY idx_sessions_expires (expiresAt),
-  CONSTRAINT fk_sessions_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE CASCADE
+  KEY idx_sessions_expires (expiresAt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS workouts (
@@ -46,16 +46,13 @@ CREATE TABLE IF NOT EXISTS workouts (
   userId CHAR(36) NOT NULL,
   username VARCHAR(120) NOT NULL,
   date DATE NOT NULL,
-  muscle VARCHAR(120) NOT NULL,
-  variation TEXT NULL,
-  reps VARCHAR(120) NULL,
+  musclegroup VARCHAR(120) NOT NULL,
+  exercises TEXT NULL,
+  setsreps VARCHAR(120) NULL,
   notes TEXT NULL,
   PRIMARY KEY (workoutId),
   KEY idx_workouts_user_date (userId, date),
-  KEY idx_workouts_username_date (username, date),
-  CONSTRAINT fk_workouts_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE CASCADE
+  KEY idx_workouts_username_date (username, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -67,10 +64,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (eventId),
   KEY idx_audit_user_created (userId, createdAt),
-  KEY idx_audit_type_created (eventType, createdAt),
-  CONSTRAINT fk_audit_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE SET NULL
+  KEY idx_audit_type_created (eventType, createdAt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS goals (
@@ -90,10 +84,7 @@ CREATE TABLE IF NOT EXISTS goals (
   targetUnit VARCHAR(32) NULL,
   PRIMARY KEY (goalId),
   KEY idx_goals_user_active (userId, isActive),
-  KEY idx_goals_period (period),
-  CONSTRAINT fk_goals_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE CASCADE
+  KEY idx_goals_period (period)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS activity (
@@ -108,10 +99,7 @@ CREATE TABLE IF NOT EXISTS activity (
   notes TEXT NULL,
   PRIMARY KEY (activityId),
   UNIQUE KEY uq_activity_user_date (userId, date),
-  KEY idx_activity_username_date (username, date),
-  CONSTRAINT fk_activity_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE CASCADE
+  KEY idx_activity_username_date (username, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS bot_commands (
@@ -131,10 +119,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   chatId VARCHAR(64) NULL,
   PRIMARY KEY (attendanceId),
   UNIQUE KEY uq_attendance_user_date (userId, date),
-  KEY idx_attendance_name_date (name, date),
-  CONSTRAINT fk_attendance_user
-    FOREIGN KEY (userId) REFERENCES users(userId)
-    ON DELETE SET NULL
+  KEY idx_attendance_name_date (name, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS motivation_quotes (
