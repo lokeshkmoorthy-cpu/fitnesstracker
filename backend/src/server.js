@@ -74,6 +74,12 @@ async function query(sql, params) {
   const [rows] = await pool.query(sql, params);
   return rows;
 }
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason instanceof Error ? reason.stack || reason.message : reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[uncaughtException]", error instanceof Error ? error.stack || error.message : error);
+});
 const token = process.env.TELEGRAM_BOT_TOKEN;
 let bot = null;
 if (token) {
@@ -290,6 +296,40 @@ async function ensureSchema() {
   ];
   for (const statement of statements) {
     await pool.query(statement);
+  }
+  await reconcileSchema();
+}
+async function columnExists(table, column) {
+  const rows = await query(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1",
+    [table, column]
+  );
+  return rows.length > 0;
+}
+async function renameColumnIfNeeded(table, oldColumn, newColumn, definition) {
+  const hasOld = await columnExists(table, oldColumn);
+  const hasNew = await columnExists(table, newColumn);
+  if (hasOld && !hasNew) {
+    await pool.query(`ALTER TABLE \`${table}\` CHANGE \`${oldColumn}\` \`${newColumn}\` ${definition}`);
+    console.log(`Schema reconcile: renamed ${table}.${oldColumn} -> ${newColumn}`);
+  }
+}
+async function dropForeignKeys(table) {
+  const rows = await query(
+    "SELECT DISTINCT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL",
+    [table]
+  );
+  for (const row of rows) {
+    await pool.query(`ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${row.CONSTRAINT_NAME}\``);
+    console.log(`Schema reconcile: dropped FK ${table}.${row.CONSTRAINT_NAME}`);
+  }
+}
+async function reconcileSchema() {
+  await renameColumnIfNeeded("workouts", "muscle", "musclegroup", "VARCHAR(120) NOT NULL");
+  await renameColumnIfNeeded("workouts", "variation", "exercises", "TEXT NULL");
+  await renameColumnIfNeeded("workouts", "reps", "setsreps", "VARCHAR(120) NULL");
+  for (const table of ["sessions", "workouts", "audit_log", "goals", "activity", "attendance"]) {
+    await dropForeignKeys(table);
   }
 }
 async function ensureAuthSheets() {
