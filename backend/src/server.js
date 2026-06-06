@@ -317,8 +317,27 @@ async function ensureAuthSheets() {
       console.log("Default bot commands populated.");
     }
   } catch (error) {
-    console.error("FATAL: Failed to ensure database schema:", error);
-    process.exit(1);
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+}
+async function initDatabaseWithRetry() {
+  const baseDelayMs = 3e3;
+  const maxDelayMs = 3e4;
+  let attempt = 0;
+  for (; ; ) {
+    attempt += 1;
+    try {
+      await ensureAuthSheets();
+      console.log("Database schema verified.");
+      return;
+    } catch (error) {
+      const delayMs = Math.min(maxDelayMs, baseDelayMs * attempt);
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(
+        `Database init failed (attempt ${attempt}). API stays up; retrying in ${Math.round(delayMs / 1e3)}s. Cause: ${reason}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
 }
 async function getUsers() {
@@ -1719,12 +1738,7 @@ app.get("/api/streaks", requireAuth, async (req, res) => {
 });
 async function startServer() {
   assertCriticalEnvForProduction();
-  try {
-    await ensureAuthSheets();
-    console.log("Database schema verified.");
-  } catch (error) {
-    console.error("Failed to verify database schema:", error);
-  }
+  void initDatabaseWithRetry();
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       root: frontendRoot,

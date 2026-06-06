@@ -10,7 +10,11 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   // adjust this value based on your RDS instance size
   queueLimit: 0,
-  dateStrings: true
+  dateStrings: true,
+  // fail fast instead of hanging when RDS is unreachable (e.g. security group / network)
+  connectTimeout: 15000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 1e4
 });
 const testConnection = async () => {
   try {
