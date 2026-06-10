@@ -12,13 +12,5 @@
     "preview": "npm run preview -w @fitnesstracker/frontend",
     "clean": "rm -rf frontend/dist",
     "lint": "npm run lint -w @fitnesstracker/frontend && npm run lint -w @fitnesstracker/backend"
-  },
-  "optionalDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.61.1"
-  },
-  "dependencies": {
-    "@esbuild/win32-x64": "^0.28.0",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.0",
-    "lightningcss-win32-x64-msvc": "^1.32.0"
   }
 }
