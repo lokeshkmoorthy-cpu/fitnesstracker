@@ -87,7 +87,12 @@ process.on("uncaughtException", (error) => {
 const token = process.env.TELEGRAM_BOT_TOKEN;
 let bot = null;
 if (token) {
-  bot = new TelegramBot(token, { polling: true });
+  bot = new TelegramBot(token, {
+    polling: true,
+    request: {
+      family: 4
+    }
+  });
   console.log(
     `[telegram] polling started (pid=${process.pid}). Only one process may use TELEGRAM_BOT_TOKEN; duplicate pollers cause 409 Conflict.`
   );
